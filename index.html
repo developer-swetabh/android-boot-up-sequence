@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AOSP/AAOS Boot &amp; Image Architecture — Phase 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" defer></script>
+<style>
+:root{--bg0:#080c18;--bg1:#0d1225;--bg2:#111827;--bg3:#161e33;--bgc:#0a0f1e;--amber:#f5a623;--blue:#4a9eff;--green:#00e5a0;--red:#ff4f6a;--purple:#b06efb;--orange:#ff8c42;--txt:#e8edf7;--txt2:#a0aec0;--txt3:#5a6a8a;--border:#1e2d4a;--border2:#2a4070;--nav:60px;--tab:48px;--r:12px;--rs:6px;--fd:'Orbitron',monospace;--fb:'Outfit',sans-serif;--fc:'JetBrains Mono',monospace;--dur:0.28s}
+@media(prefers-reduced-motion:reduce){:root{--dur:0s}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}body{background:var(--bg0);color:var(--txt);font-family:var(--fb);line-height:1.7;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(74,158,255,.024) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,.024) 1px,transparent 1px);background-size:40px 40px}
+h2{font-family:var(--fd);font-size:clamp(1.1rem,2.5vw,1.6rem);color:var(--amber);letter-spacing:.04em;line-height:1.2}
+h3{font-family:var(--fd);font-size:clamp(.88rem,1.8vw,1.18rem);color:var(--blue);letter-spacing:.04em;line-height:1.2}
+h4{font-family:var(--fd);font-size:.86rem;color:var(--green);font-weight:700;letter-spacing:.04em}
+p{margin-bottom:.9rem;color:var(--txt2);max-width:80ch}a{color:var(--blue)}strong{color:var(--txt);font-weight:600}
+kbd{font-family:var(--fc);font-size:.78em;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:1px 5px;color:var(--txt2)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px;position:relative;z-index:1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:22px}@media(max-width:860px){.g2{grid-template-columns:1fr}}
+#topbar{position:sticky;top:0;z-index:300;background:rgba(8,12,24,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);height:var(--nav);display:flex;align-items:center}
+.tb-inner{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1180px;margin:0 auto;padding:0 22px;gap:14px}
+.tb-logo{font-family:var(--fd);font-size:.76rem;font-weight:900;color:var(--amber);letter-spacing:.12em;white-space:nowrap}.tb-logo span{color:var(--blue)}
+#rm-btn{display:flex;align-items:center;gap:8px;font-family:var(--fc);font-size:.66rem;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:var(--rs);padding:5px 10px;cursor:pointer;transition:color var(--dur),border-color var(--dur)}
+#rm-btn:hover,#rm-btn.on{color:var(--amber);border-color:var(--amber)}
+.sw{width:28px;height:16px;background:var(--border2);border-radius:8px;position:relative;transition:background var(--dur);flex-shrink:0}
+.sw::after{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--txt3);transition:transform var(--dur),background var(--dur)}
+#rm-btn.on .sw{background:var(--amber)}#rm-btn.on .sw::after{transform:translateX(12px);background:#fff}
+#tabbar{position:sticky;top:var(--nav);z-index:200;background:rgba(8,12,24,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+#tab-toggle{display:none;width:100%;text-align:left;background:none;border:none;color:var(--txt2);font-family:var(--fc);font-size:.74rem;padding:11px 22px;cursor:pointer}
+.tl-inner{display:flex;align-items:stretch;max-width:1180px;margin:0 auto;padding:0 22px;height:var(--tab);overflow-x:auto;scrollbar-width:none}
+.tl-inner::-webkit-scrollbar{display:none}
+[role="tab"]{font-family:var(--fc);font-size:.64rem;letter-spacing:.04em;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;padding:0 12px;cursor:pointer;white-space:nowrap;height:100%;display:flex;align-items:center;gap:6px;transition:color var(--dur),border-color var(--dur)}
+[role="tab"]:hover{color:var(--txt2)}[role="tab"][aria-selected="true"]{color:var(--amber);border-bottom-color:var(--amber)}
+[role="tab"]:focus-visible{outline:2px solid var(--amber);outline-offset:-2px;border-radius:3px}
+.tn{font-size:.58rem;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.28);color:var(--amber);padding:1px 5px;border-radius:3px}
+@media(max-width:820px){#tab-toggle{display:block}.tl-inner{flex-direction:column;height:auto;padding:0;display:none;overflow:visible;border-top:1px solid var(--border)}.tl-inner.open{display:flex}[role="tab"]{border-bottom:none;border-left:3px solid transparent;padding:11px 22px;height:auto;width:100%}[role="tab"][aria-selected="true"]{border-left-color:var(--amber);border-bottom-color:transparent;background:rgba(245,166,35,.04)}}
+[role="tabpanel"]{display:none;padding:48px 0 76px}[role="tabpanel"].active{display:block;animation:fi var(--dur) ease}[role="tabpanel"]:focus-visible{outline:none}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.sh{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.sn{font-family:var(--fc);font-size:.68rem;color:var(--amber);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.28);padding:3px 9px;border-radius:3px;letter-spacing:.1em}
+.note{display:flex;gap:11px;padding:12px 15px;border-radius:var(--rs);margin:13px 0;border-left:3px solid}
+.ni-icon{font-size:.95rem;flex-shrink:0;margin-top:2px}.nb strong{display:block;font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}.nb p{font-size:.81rem;margin-bottom:0}
+.nt{background:rgba(0,229,160,.055);border-color:var(--green)}.nt .ni-icon,.nt strong{color:var(--green)}
+.nw{background:rgba(245,166,35,.055);border-color:var(--amber)}.nw .ni-icon,.nw strong{color:var(--amber)}
+.ni2{background:rgba(74,158,255,.055);border-color:var(--blue)}.ni2 .ni-icon,.ni2 strong{color:var(--blue)}
+.nd{background:rgba(255,79,106,.055);border-color:var(--red)}.nd .ni-icon,.nd strong{color:var(--red)}
+.cb{position:relative;background:var(--bgc);border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;margin:12px 0}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:6px 13px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.018)}
+.cl{font-family:var(--fc);font-size:.64rem;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase}
+.cp-btn{font-family:var(--fc);font-size:.63rem;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 9px;cursor:pointer;transition:all .2s}
+.cp-btn:hover,.cp-btn.ok{color:var(--green);border-color:var(--green)}
+pre{padding:13px 15px;overflow-x:auto;font-family:var(--fc);font-size:.76rem;line-height:1.65;color:#7dd3fc;white-space:pre}
+code{font-family:var(--fc);font-size:.82em;background:rgba(74,158,255,.1);color:#7dd3fc;padding:2px 5px;border-radius:3px}
+pre code{background:none;padding:0;font-size:inherit;color:inherit}
+.cm{color:#5a7a9a}.kw{color:var(--purple)}.st{color:var(--green)}.nm{color:var(--amber)}.ty{color:var(--blue)}
+.dw{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:20px 0}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:9px 15px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+.dt{font-family:var(--fc);font-size:.67rem;color:var(--txt3);letter-spacing:.07em;text-transform:uppercase}
+.da{display:flex;gap:5px}
+.db-btn{font-family:var(--fc);font-size:.63rem;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:4px;padding:4px 9px;cursor:pointer;transition:all .2s}
+.db-btn:hover{color:var(--blue);border-color:var(--blue)}
+.dbody{padding:18px;overflow:auto}.dcap{padding:9px 15px;border-top:1px solid var(--border);font-size:.75rem;color:var(--txt3);font-style:italic}
+.di{max-width:100%;height:auto;display:block;border-radius:var(--rs)}
+.mermaid-wrap{display:flex;justify-content:center;overflow-x:auto;min-height:60px}
+.mermaid-wrap svg{max-width:100%;height:auto}
+.mermaid-error{background:rgba(255,79,106,.06);border:1px solid var(--red);border-radius:var(--rs);padding:14px;font-family:var(--fc);font-size:.74rem;color:var(--red)}
+.mermaid-source{background:var(--bgc);border:1px solid var(--border);border-radius:var(--rs);padding:12px;margin-top:8px;font-size:.72rem;color:var(--txt3);white-space:pre;overflow-x:auto}
+.zw{overflow:auto;cursor:grab}.zw:active{cursor:grabbing}
+.zi{transform-origin:top left;transition:transform calc(var(--dur)*.5);display:inline-block;min-width:100%;position:relative}
+/* ── TOOLTIP with deep-dive ── */
+#tt{position:fixed;z-index:9900;background:#1a2540;border:1px solid var(--amber);color:var(--txt);font-family:var(--fb);font-size:.79rem;line-height:1.5;padding:14px 38px 14px 16px;border-radius:var(--rs);width:340px;max-width:92vw;box-shadow:0 8px 30px rgba(0,0,0,.65);display:none;pointer-events:auto}
+#tt.show{display:block;animation:ttf calc(var(--dur)*.8) ease}
+#tt.wide{width:500px;max-width:96vw}
+@keyframes ttf{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+#tt h5{font-family:var(--fc);font-size:.68rem;color:var(--amber);margin-bottom:7px;letter-spacing:.07em}
+#tt p{font-size:.77rem;color:var(--txt2);margin-bottom:8px}#tt p:last-child{margin-bottom:0}
+#tt code{font-size:.72rem}
+.ttrm{font-family:var(--fc);font-size:.67rem;color:var(--blue);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;margin-right:10px}
+.tt-dd-btn{font-family:var(--fc);font-size:.65rem;color:var(--green);background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.3);border-radius:4px;padding:3px 9px;cursor:pointer;transition:all .2s}
+.tt-dd-btn:hover{background:rgba(0,229,160,.16)}
+.tt-dd-btn.open{color:var(--amber);border-color:var(--amber);background:rgba(245,166,35,.07)}
+#tt-dd{display:none;margin-top:11px;padding-top:11px;border-top:1px solid var(--border2)}
+#tt-dd.open{display:block;animation:fi calc(var(--dur)*.5) ease}
+#tt-dd p{font-size:.74rem}
+#tt-dd h6{font-family:var(--fc);font-size:.62rem;color:var(--green);margin:8px 0 4px;letter-spacing:.06em;text-transform:uppercase}
+#tt-dd .cb{margin:5px 0}#tt-dd pre{font-size:.67rem;padding:8px 10px}
+#tt-close{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid var(--border2);border-radius:4px;color:var(--txt3);cursor:pointer;font-size:.82rem;transition:all .15s}
+#tt-close:hover{background:rgba(255,79,106,.15);border-color:var(--red);color:var(--red)}
+.bd-node{cursor:pointer;outline:none}.bd-node rect{pointer-events:fill}
+.bd-node:hover rect,.bd-node:focus-visible rect,.bd-node[aria-expanded="true"] rect{fill:rgba(245,166,35,.09)!important;stroke:rgba(245,166,35,.65)!important;stroke-width:2!important}
+.bd-node:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+/* collapsibles */
+.coll{border:1px solid var(--border);border-radius:var(--rs);margin:11px 0;overflow:hidden}
+.coll summary{display:flex;align-items:center;gap:9px;padding:11px 15px;cursor:pointer;font-family:var(--fc);font-size:.76rem;color:var(--txt2);background:var(--bg2);list-style:none;user-select:none;transition:background var(--dur)}
+.coll summary::-webkit-details-marker{display:none}
+.coll summary::before{content:'▶';font-size:.56rem;color:var(--amber);transition:transform var(--dur);flex-shrink:0}
+.coll[open] summary::before{transform:rotate(90deg)}.coll summary:hover{background:var(--bg3)}
+.coll-body{padding:16px;border-top:1px solid var(--border);background:var(--bg1)}.coll-body p{font-size:.83rem}
+/* tables */
+.tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin:14px 0}
+.tbl th{font-family:var(--fc);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;padding:8px 11px;background:rgba(255,255,255,.03);border-bottom:2px solid var(--border2);color:var(--amber);text-align:left}
+.tbl td{padding:8px 11px;border-bottom:1px solid var(--border);color:var(--txt2);vertical-align:top}
+.tbl tr:hover td{background:rgba(255,255,255,.016)}.tbl td:first-child{font-family:var(--fc);font-size:.73rem;color:var(--blue);white-space:nowrap}
+.by{font-family:var(--fc);font-size:.6rem;padding:2px 6px;border-radius:100px;background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.3)}
+.bn{font-family:var(--fc);font-size:.6rem;padding:2px 6px;border-radius:100px;background:rgba(255,79,106,.1);color:var(--red);border:1px solid rgba(255,79,106,.25)}
+/* BCB struct */
+.bcb{display:grid;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;font-family:var(--fc);font-size:.72rem}
+.bcbr{display:flex;border-bottom:1px solid var(--border)}.bcbr:last-child{border-bottom:none}
+.bco{width:68px;flex-shrink:0;background:rgba(74,158,255,.055);color:var(--blue);padding:7px 9px;font-size:.64rem;border-right:1px solid var(--border);display:flex;align-items:center}
+.bcf{width:150px;flex-shrink:0;color:var(--green);padding:7px 9px;border-right:1px solid var(--border);display:flex;align-items:center}
+.bcsz{width:64px;flex-shrink:0;color:var(--amber);padding:7px 9px;border-right:1px solid var(--border);display:flex;align-items:center;font-size:.64rem}
+.bcd{flex:1;color:var(--txt2);padding:7px 9px;font-family:var(--fb);font-size:.76rem;display:flex;align-items:center}
+/* dm-verity pipeline */
+.dmv-pipeline{display:flex;flex-direction:column;gap:0;margin:16px 0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.dmv-layer{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border);transition:background var(--dur)}
+.dmv-layer:last-child{border-bottom:none}.dmv-layer:hover{background:rgba(255,255,255,.013)}
+.dmv-icon{font-size:1.3rem;flex-shrink:0;width:30px;text-align:center}
+.dmv-name{font-family:var(--fc);font-size:.76rem;color:var(--txt);font-weight:600;margin-bottom:1px}
+.dmv-desc{font-size:.74rem;color:var(--txt3)}
+.dmv-arrow{font-family:var(--fc);font-size:.9rem;color:var(--border2);flex-shrink:0}
+/* stepper */
+#dmv{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:18px 0}
+.dmvstep{display:none;padding:18px}.dmvstep.active{display:block;animation:fi var(--dur) ease}
+.dmvnav{display:flex;align-items:center;gap:11px;padding:12px 18px;border-top:1px solid var(--border);background:rgba(255,255,255,.012)}
+.dmvbtn{font-family:var(--fc);font-size:.7rem;color:var(--txt2);background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);padding:5px 15px;cursor:pointer;transition:all var(--dur)}
+.dmvbtn:hover:not(:disabled){color:var(--amber);border-color:var(--amber)}.dmvbtn:disabled{opacity:.35;cursor:not-allowed}
+.dmvprog{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.dmvfill{height:100%;border-radius:2px;background:linear-gradient(to right,var(--amber),var(--blue));transition:width .4s ease}
+.dmvctr{font-family:var(--fc);font-size:.66rem;color:var(--txt3);white-space:nowrap}
+/* init.rc */
+.ircstage{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}.ircstage:last-child{border-bottom:none}
+.ircbadge{font-family:var(--fc);font-size:.66rem;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.28);color:var(--amber);padding:3px 8px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:3px}
+.ircc{flex:1}.ircc h4{margin-bottom:3px}.ircc p{font-size:.8rem;margin-bottom:5px}
+/* boot timeline */
+.btl{position:relative;padding-left:26px;margin:16px 0}
+.btl::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--amber),var(--blue),var(--green))}
+.bts{position:relative;margin-bottom:18px}
+.btd{position:absolute;left:-23px;top:4px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg0)}
+.bts:nth-child(-n+3) .btd{background:var(--amber)}.bts:nth-child(4) .btd,.bts:nth-child(5) .btd{background:var(--blue)}.bts:nth-child(n+6) .btd{background:var(--green)}
+.bt-t{font-family:var(--fc);font-size:.64rem;color:var(--amber);margin-bottom:1px}
+.bt-h{font-family:var(--fc);font-size:.81rem;color:var(--txt);margin-bottom:2px}
+.bt-p{font-size:.78rem;color:var(--txt3);margin:0;max-width:none}
+/* subsystems */
+.ssg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px;margin:16px 0}
+.ssc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;transition:all var(--dur)}
+.ssc:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.ssicon{font-size:1.5rem;margin-bottom:9px;display:block}.ssname{font-family:var(--fc);font-size:.83rem;color:var(--txt);margin-bottom:2px;font-weight:600}
+.ssproc{font-size:.7rem;color:var(--txt3);margin-bottom:9px;font-family:var(--fc)}.ssdesc{font-size:.77rem;color:var(--txt2);margin:0;max-width:none}
+.ssind{display:flex;align-items:center;gap:6px;margin-top:10px}.ssidot{width:6px;height:6px;border-radius:50%;flex-shrink:0}.ssilbl{font-family:var(--fc);font-size:.62rem;color:var(--txt3)}
+/* partition cards */
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:9px;margin:16px 0}
+.pc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;cursor:pointer;transition:all var(--dur);position:relative;overflow:hidden}
+.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.pca::before{background:var(--amber)}.pcs::before{background:var(--blue)}.pcv::before{background:var(--green)}.pcm::before{background:var(--red)}.pcn::before{background:var(--orange)}
+.pc:hover{border-color:var(--border2);background:var(--bg3);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.5)}.pc.sel{border-color:var(--amber)}
+.pn{font-family:var(--fc);font-size:.77rem;color:var(--txt);margin-bottom:3px;font-weight:600}.po{font-size:.68rem;color:var(--txt3);margin-bottom:5px}
+.ptags{display:flex;flex-wrap:wrap;gap:3px}.ptag{font-family:var(--fc);font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.038);color:var(--txt3);border:1px solid var(--border)}
+#pd{display:none;background:var(--bg2);border:1px solid var(--amber);border-radius:var(--r);padding:20px;margin-top:13px;animation:fi var(--dur) ease}#pd.show{display:block}
+/* partition timeline */
+.ptl{margin:18px 0}.ptlrow{display:flex;align-items:stretch;margin-bottom:2px}
+.ptllbl{width:136px;flex-shrink:0;font-family:var(--fc);font-size:.68rem;color:var(--txt3);display:flex;align-items:center;padding-right:11px;justify-content:flex-end;border-right:2px solid var(--border)}
+.ptlblks{flex:1;display:flex;align-items:center;padding:3px 0 3px 13px;gap:4px;flex-wrap:wrap}
+.ptldiv{height:1px;background:var(--border);margin:2px 0 2px 148px}
+.ptlb{height:26px;border-radius:4px;display:flex;align-items:center;font-family:var(--fc);font-size:.62rem;font-weight:600;padding:0 8px;cursor:pointer;white-space:nowrap;opacity:0;transform:translateX(-8px);position:relative}
+.ptlb.anim{opacity:1;transform:none;transition:opacity .4s ease,transform .4s ease}
+.ptlb.ca{background:rgba(245,166,35,.18);border:1px solid rgba(245,166,35,.44);color:var(--amber)}
+.ptlb.cs{background:rgba(74,158,255,.18);border:1px solid rgba(74,158,255,.44);color:var(--blue)}
+.ptlb.cv{background:rgba(0,229,160,.18);border:1px solid rgba(0,229,160,.44);color:var(--green)}
+.ptlb.cm{background:rgba(255,79,106,.18);border:1px solid rgba(255,79,106,.44);color:var(--red)}
+.ptlb.cn{background:rgba(255,140,66,.18);border:1px solid rgba(255,140,66,.44);color:var(--orange)}
+.ptlb.cp{background:rgba(176,110,251,.18);border:1px solid rgba(176,110,251,.44);color:var(--purple)}
+.ptlb.cg{background:rgba(90,106,138,.18);border:1px solid rgba(90,106,138,.4);color:#7a8aaa}
+/* faq */
+.faq{border:1px solid var(--border);border-radius:var(--rs);margin-bottom:9px;overflow:hidden}
+.faqq{display:flex;align-items:center;gap:11px;padding:13px 17px;cursor:pointer;background:var(--bg2);transition:background var(--dur);user-select:none}
+.faqq:hover{background:var(--bg3)}.faqn{font-family:var(--fc);font-size:.67rem;color:var(--amber);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.24);padding:2px 7px;border-radius:3px;flex-shrink:0}
+.faqt{font-size:.9rem;color:var(--txt);font-weight:500;flex:1}.faqch{color:var(--amber);transition:transform var(--dur);flex-shrink:0}
+.faq.open .faqch{transform:rotate(180deg)}
+.faqa{max-height:0;overflow:hidden;background:var(--bg1);transition:max-height .32s ease,padding .32s}
+.faq.open .faqa{max-height:800px;padding:16px;border-top:1px solid var(--border)}
+.faqa p{font-size:.84rem;margin-bottom:.7rem}.faqa p:last-child{margin-bottom:0}
+.tsl{list-style:none;padding:0;margin:14px 0}
+.tsl li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);font-size:.82rem;color:var(--txt2)}
+.tsl li:last-child{border-bottom:none}.tsl li::before{content:'✦';color:var(--amber);font-size:.7rem;margin-top:4px;flex-shrink:0}
+.lhero{width:110px;height:110px;flex-shrink:0;opacity:.65}
+.rv{opacity:0;transform:translateY(12px);transition:opacity .42s ease,transform .42s ease}.rv.in{opacity:1;transform:none}
+footer{padding:28px 0;border-top:1px solid var(--border);text-align:center}footer p{font-size:.74rem;color:var(--txt3);margin:0;max-width:none}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:3px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<div id="topbar" role="banner">
+  <div class="tb-inner">
+    <div class="tb-logo">AOSP<span>/</span>AAOS <span style="font-weight:400;color:var(--txt3);font-size:.64rem;letter-spacing:.04em">Boot &amp; Image Architecture</span></div>
+    <button id="rm-btn" role="switch" aria-checked="false" aria-label="Toggle reduce motion"><div class="sw" aria-hidden="true"></div><span>Reduce motion</span></button>
+  </div>
+</div>
+<div id="tabbar" role="navigation" aria-label="Section tabs">
+  <button id="tab-toggle" aria-expanded="false" aria-controls="tl-inner" onclick="tmt()">☰ Sections</button>
+  <div class="tl-inner" id="tl-inner" role="tablist" aria-label="Page sections">
+    <button role="tab" id="tab-boot"     aria-selected="true"  aria-controls="panel-boot"     tabindex="0"><span class="tn">01</span>Boot Flow</button>
+    <button role="tab" id="tab-kinit"    aria-selected="false" aria-controls="panel-kinit"    tabindex="-1"><span class="tn">02</span>Kernel→Init</button>
+    <button role="tab" id="tab-avb"      aria-selected="false" aria-controls="panel-avb"      tabindex="-1"><span class="tn">03</span>AVB</button>
+    <button role="tab" id="tab-recovery" aria-selected="false" aria-controls="panel-recovery" tabindex="-1"><span class="tn">04</span>Recovery</button>
+    <button role="tab" id="tab-hlos"     aria-selected="false" aria-controls="panel-hlos"     tabindex="-1"><span class="tn">05</span>HLOS vs Non-HLOS</button>
+    <button role="tab" id="tab-images"   aria-selected="false" aria-controls="panel-images"   tabindex="-1"><span class="tn">06</span>Android Images</button>
+    <button role="tab" id="tab-faq"      aria-selected="false" aria-controls="panel-faq"      tabindex="-1"><span class="tn">07</span>FAQ &amp; Debug</button>
+  </div>
+</div>
+<!-- Tooltip: single instance, repositioned by JS. Deep-dive toggle expands inline content. -->
+<div id="tt" role="tooltip" aria-live="polite" aria-atomic="true">
+  <button id="tt-close" onclick="htt()" aria-label="Close tooltip">✕</button>
+  <h5 id="tt-title"></h5><p id="tt-body"></p>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+    <button class="ttrm" id="tt-rm" onclick="ttRM()" style="display:none">Read more →</button>
+    <button class="tt-dd-btn" id="tt-dd-btn" onclick="toggleDD()" style="display:none" aria-expanded="false" aria-controls="tt-dd">Show deep dive ▼</button>
+  </div>
+  <div id="tt-dd" role="region" aria-label="Deep dive content"></div>
+</div>
+<!-- ═══ PANEL 1 — BOOT FLOW ══════════════════════════════════════ -->
+<section role="tabpanel" id="panel-boot" aria-labelledby="tab-boot" class="active" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">01</span><h2>Boot-up Flow</h2></div>
+<div class="g2" style="align-items:center;margin-bottom:28px">
+  <div>
+    <p>On an Android Automotive device boot is a <strong>verified handoff chain</strong> across eight stages. Each stage cryptographically authenticates the next before transferring execution. A failure at any stage halts the device in a safe state.</p>
+    <div class="note nt rv"><span class="ni-icon">💡</span><div class="nb"><strong>Junior tip</strong><p>Think of boot like a relay race — each runner can only start after receiving the baton (authentication signature) from the previous one.</p></div></div>
+  </div>
+  <div style="display:flex;justify-content:center"><div id="hero-lottie" class="lhero" aria-hidden="true" data-lottie="assets/lottie/boot-pulse.json" data-loop="false"></div></div>
+</div>
+<div class="dw">
+  <div class="dh"><span class="dt">Fig 1.1 — Boot Chain Block Diagram (click any block for details + deep dive)</span>
+  <div class="da"><a class="db-btn" href="assets/diagrams/boot-flow-block.png" download aria-label="Download PNG">⬇ PNG</a><button class="db-btn" onclick="zD('bz',1.2)" aria-label="Zoom in">＋</button><button class="db-btn" onclick="zD('bz',.83)" aria-label="Zoom out">－</button><button class="db-btn" onclick="rzD('bz')" aria-label="Reset zoom">⊡</button></div></div>
+  <div class="dbody zw"><div class="zi" id="bz">
+    <img class="di" src="assets/diagrams/boot-flow-block.png" style="width:100%;max-width:860px" alt="Android boot chain: PBL, XBL, ABL, AVB 2.0, TrustZone, Linux Kernel, Ramdisk/tmpfs, Device Tree, First Stage Init, Second Stage Init, Zygote, System Server, Launcher"/>
+    <svg viewBox="0 0 880 510" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible" role="group" aria-label="Clickable boot diagram nodes">
+      <g class="bd-node" role="button" tabindex="0" aria-label="PBL" aria-expanded="false" data-tid="pbl" onclick="st(event,'pbl')" onkeydown="nk(event,'pbl')"><rect x="36" y="65" width="120" height="90" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="XBL" aria-expanded="false" data-tid="xbl" onclick="st(event,'xbl')" onkeydown="nk(event,'xbl')"><rect x="174" y="65" width="120" height="90" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="ABL" aria-expanded="false" data-tid="abl" onclick="st(event,'abl')" onkeydown="nk(event,'abl')"><rect x="312" y="65" width="120" height="90" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="AVB 2.0" aria-expanded="false" data-tid="avb" onclick="st(event,'avb')" onkeydown="nk(event,'avb')"><rect x="448" y="65" width="145" height="90" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="TrustZone" aria-expanded="false" data-tid="tz" onclick="st(event,'tz')" onkeydown="nk(event,'tz')"><rect x="612" y="65" width="148" height="90" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Linux Kernel" aria-expanded="false" data-tid="kernel" onclick="st(event,'kernel')" onkeydown="nk(event,'kernel')"><rect x="36" y="224" width="168" height="88" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Ramdisk to tmpfs" aria-expanded="false" data-tid="ramdisk" onclick="st(event,'ramdisk')" onkeydown="nk(event,'ramdisk')"><rect x="218" y="224" width="168" height="88" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Device Tree" aria-expanded="false" data-tid="dt" onclick="st(event,'dt')" onkeydown="nk(event,'dt')"><rect x="402" y="224" width="148" height="88" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="First Stage Init" aria-expanded="false" data-tid="fsi" onclick="st(event,'fsi')" onkeydown="nk(event,'fsi')"><rect x="36" y="330" width="215" height="68" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Second Stage Init" aria-expanded="false" data-tid="ssi" onclick="st(event,'ssi')" onkeydown="nk(event,'ssi')"><rect x="267" y="330" width="215" height="68" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Zygote" aria-expanded="false" data-tid="zygote" onclick="st(event,'zygote')" onkeydown="nk(event,'zygote')"><rect x="36" y="422" width="152" height="62" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="System Server" aria-expanded="false" data-tid="sysserver" onclick="st(event,'sysserver')" onkeydown="nk(event,'sysserver')"><rect x="204" y="422" width="162" height="62" rx="8" fill="transparent" stroke="transparent"/></g>
+      <g class="bd-node" role="button" tabindex="0" aria-label="Launcher" aria-expanded="false" data-tid="launcher" onclick="st(event,'launcher')" onkeydown="nk(event,'launcher')"><rect x="384" y="422" width="152" height="62" rx="8" fill="transparent" stroke="transparent"/></g>
+    </svg>
+  </div></div>
+  <p class="dcap">Fig 1.1 — Click or Tab+Enter any block for a summary and expandable deep dive. Amber=bootloader · Blue=kernel · Purple=secure world. <a href="assets/diagrams/boot-flow-block.png" download>Download PNG (300 DPI)</a></p>
+</div>
+<div class="dw"><div class="dh"><span class="dt">Fig 1.2 — Boot Stage Handoff Sequence</span><div class="da"><a class="db-btn" href="assets/diagrams/boot-flow-sequence.png" download>⬇ PNG</a></div></div>
+<div class="dbody"><div id="boot-seq-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 1.2 — Each arrow is a verify-then-load handoff. PID 1 is preserved through all three execv transitions in init.</p></div>
+<h3 style="margin:28px 0 12px">Approximate Boot Timeline</h3>
+<div class="btl">
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T = 0 ms</div><div class="bt-h">Power-on → PBL</div><p class="bt-p">CPU reset vector in ROM. eFuse OEM key hash authenticates XBL. Hardware root of trust established.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 50–200 ms</div><div class="bt-h">XBL — hardware init</div><p class="bt-p">DDR, clocks, regulators. Loads TrustZone (EL3) and AOP firmware before handing off to ABL.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 200–800 ms</div><div class="bt-h">ABL — boot decision + AVB</div><p class="bt-p">Reads BCB from misc, checks RPMB rollback index via TrustZone SMC, runs libavb, merges ramdisks.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 800–1500 ms</div><div class="bt-h">Linux Kernel</div><p class="bt-p"><code>populate_rootfs()</code> decompresses merged cpio into tmpfs. No eMMC filesystem access yet.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 1500–2500 ms</div><div class="bt-h">First Stage Init</div><p class="bt-p">dm-linear from LpMetadata, dm-verity from AVB hash tree. Mounts /system /vendor /odm read-only.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 2500–4000 ms</div><div class="bt-h">Second Stage Init</div><p class="bt-p">SELinux loaded. .rc files parsed. Vendor .ko modules via modprobe. class core → hal → main.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 4000–7000 ms</div><div class="bt-h">Zygote + System Server</div><p class="bt-p">ART preloaded. AMS, WMS, PMS started. BOOT_COMPLETED broadcast.</p></div>
+  <div class="bts rv"><div class="btd"></div><div class="bt-t">T ≈ 6–10 s</div><div class="bt-h">Launcher visible</div><p class="bt-p">All HALs operational. Camera pipeline must be live within 2 s of ignition on automotive builds.</p></div>
+</div>
+</div></section>
+<!-- ═══ PANEL 2 — KERNEL→INIT ════════════════════════════════════ -->
+<section role="tabpanel" id="panel-kinit" aria-labelledby="tab-kinit" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">02</span><h2>Kernel → Init Flow</h2></div>
+<p>The kernel never accesses <code>/system</code> to find <code>/init</code>. It executes <code>/init</code> from RAM-only tmpfs built from the merged cpio ramdisk ABL loaded into DDR. First stage init is what mounts <code>/system</code>.</p>
+<div class="note nw"><span class="ni-icon">⚠️</span><div class="nb"><strong>Common misconception</strong><p>When the kernel first runs <code>/init</code>, the <code>/system</code> partition does not exist yet. It comes from tmpfs in RAM.</p></div></div>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 2.1 — populate_rootfs() &amp; Two-Stage Init Block</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/kernel-init-block.png" download>⬇ PNG</a><button class="db-btn" onclick="zD('kiz',1.2)">＋</button><button class="db-btn" onclick="zD('kiz',.83)">－</button><button class="db-btn" onclick="rzD('kiz')">⊡</button></div></div>
+<div class="dbody zw"><div class="zi" id="kiz"><img class="di" src="assets/diagrams/kernel-init-block.png" style="width:100%;max-width:860px" alt="Kernel to init block diagram: ramdisk extracted into tmpfs, first stage init creates dm-linear and dm-verity and mounts partitions, second stage init loads SELinux and service classes"/></div></div>
+<p class="dcap">Fig 2.1 — Ramdisk cpio extracted into RAM tmpfs. /init (PID 1) mounts real partitions via dm-linear and dm-verity. Two execv transitions keep PID 1 stable throughout.</p></div>
+
+<!-- dm-linear / dm-verity animated pipeline visual -->
+<h3 style="margin:30px 0 10px">dm-linear &amp; dm-verity — Animated Pipeline</h3>
+<p>Every block read from <code>/system</code> or <code>/vendor</code> flows through two kernel device-mapper layers before reaching the VFS. The pipeline below is interactive — hover any layer to highlight it.</p>
+<div class="dmv-pipeline" aria-label="Device mapper pipeline from VFS to eMMC">
+  <div class="dmv-layer" tabindex="0" aria-label="VFS layer" title="Virtual Filesystem — the kernel filesystem interface apps use">
+    <div class="dmv-icon">📂</div>
+    <div class="dmv-info"><div class="dmv-name">VFS (Virtual Filesystem)</div><div class="dmv-desc">open("/system/lib64/libc.so") → kernel VFS dispatches read to the mounted block device</div></div>
+    <div class="dmv-arrow">↓</div>
+  </div>
+  <div class="dmv-layer" tabindex="0" aria-label="dm-verity layer" title="dm-verity: reads and hash-checks each block before passing it up">
+    <div class="dmv-icon">🔒</div>
+    <div class="dmv-info"><div class="dmv-name">dm-verity  <code style="font-size:.65rem;color:var(--green)">system_a_verity</code></div><div class="dmv-desc">For each 4 KB block: compute SHA-256, walk Merkle tree to root, compare vs root_hash in vbmeta → PASS or panic</div></div>
+    <div class="dmv-arrow">↓</div>
+  </div>
+  <div class="dmv-layer" tabindex="0" aria-label="dm-linear layer" title="dm-linear: translates logical sector to physical sector in super">
+    <div class="dmv-icon">🗺️</div>
+    <div class="dmv-info"><div class="dmv-name">dm-linear  <code style="font-size:.65rem;color:var(--blue)">system_a</code></div><div class="dmv-desc">Logical sector N → physical sector (super_start + N) on the super block device. Zero-copy address translation from LpMetadata.</div></div>
+    <div class="dmv-arrow">↓</div>
+  </div>
+  <div class="dmv-layer" tabindex="0" aria-label="super partition layer" title="super: the physical eMMC block device containing all logical partitions">
+    <div class="dmv-icon">💾</div>
+    <div class="dmv-info"><div class="dmv-name">super partition  <code style="font-size:.65rem;color:var(--amber)">/dev/block/by-name/super</code></div><div class="dmv-desc">Single raw eMMC block device. LpMetadata header at offset 0x1000 describes all logical partition extents.</div></div>
+    <div class="dmv-arrow">↓</div>
+  </div>
+  <div class="dmv-layer" tabindex="0" aria-label="eMMC DMA layer" title="Physical eMMC transfer via DMA controller">
+    <div class="dmv-icon">⚡</div>
+    <div class="dmv-info"><div class="dmv-name">eMMC DMA Transfer</div><div class="dmv-desc">Physical 4 KB sector read via DMA controller. Data returned to dm-linear → dm-verity → VFS → application.</div></div>
+  </div>
+</div>
+
+<!-- dm-verity stepper -->
+<h3 style="margin:28px 0 10px">Step-by-Step: From eMMC to Verified Mount</h3>
+<div id="dmv">
+  <div class="dh" style="background:rgba(255,255,255,.012)">
+    <span class="dt" id="dmv-title">Step 1 of 6 — super Partition Layout</span>
+    <span style="font-family:var(--fc);font-size:.65rem;color:var(--txt3)">← Next → to walk the pipeline</span>
+  </div>
+  <div class="dmvstep active" id="dmvs1">
+    <h4>The super partition is a raw container</h4>
+    <p>All logical partitions (system, vendor, odm …) live inside one physical block device. It has no filesystem — a fixed-offset <code>LpMetadata</code> header at offset <code>0x1000</code> describes the partition table.</p>
+    <div class="cb"><div class="ch"><span class="cl">Inspect super layout</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code>adb shell lpdump /dev/block/by-name/super
+<span class="cm"># Metadata slot 0, version 10.2</span>
+<span class="cm"># Partition: system_a  Size: 1024 MiB</span>
+<span class="cm">#   Extents: 0..2097151 linear super 2048</span>
+<span class="cm"># Partition: vendor_a  Size: 512 MiB</span>
+<span class="cm">#   Extents: 0..1048575 linear super 2099200</span></code></pre></div>
+  </div>
+  <div class="dmvstep" id="dmvs2">
+    <h4>LpMetadata — logical partition map</h4>
+    <p>First stage init reads <code>LpMetadata</code> from <code>/dev/block/by-name/super</code> via the <code>liblp</code> library. It contains an array of <code>LpMetadataPartition</code> structs, each pointing to one or more <code>LpMetadataExtent</code> records defining physical sectors.</p>
+    <div class="cb"><div class="ch"><span class="cl">LpMetadata structures (simplified)</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code><span class="kw">struct</span> LpMetadataPartition {
+  <span class="ty">char</span>   name[<span class="nm">36</span>];       <span class="cm">// "system_a"</span>
+  <span class="ty">uint32</span> attributes;     <span class="cm">// READONLY | UPDATED</span>
+  <span class="ty">uint32</span> first_extent;   <span class="cm">// index into extent array</span>
+  <span class="ty">uint32</span> num_extents;
+};
+<span class="kw">struct</span> LpMetadataExtent {
+  <span class="ty">uint64</span> num_sectors;    <span class="cm">// logical sector count</span>
+  <span class="ty">uint64</span> target_data;   <span class="cm">// physical sector offset in super</span>
+};</code></pre></div>
+  </div>
+  <div class="dmvstep" id="dmvs3">
+    <h4>dm-linear — zero-copy sector translation</h4>
+    <p><code>dm-linear</code> creates a device-mapper target that translates each logical sector to a physical sector in <code>super</code> based on the extent table. No data is copied — it is a pure address translation in the kernel block layer.</p>
+    <div class="cb"><div class="ch"><span class="cl">dm-linear table + fstab.qcom</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code><span class="cm"># dmsetup table entry for system_a:</span>
+<span class="cm"># start  sectors  target  device  phys_offset</span>
+<span class="cm"># 0      2097152  linear  259:1   2048</span>
+
+adb shell dmsetup table
+adb shell ls /dev/block/mapper/
+<span class="cm"># → system_a  vendor_a  odm_a  product_a …</span>
+
+<span class="cm"># fstab.qcom tells init what to mount:</span>
+<span class="cm"># /dev/block/mapper/system_a  /system  erofs  ro,barrier=1  wait,avb=vbmeta_system</span></code></pre></div>
+  </div>
+  <div class="dmvstep" id="dmvs4">
+    <h4>dm-verity — hash-checked read-only layer</h4>
+    <p>Init wraps the dm-linear device with a <code>dm-verity</code> target. Every 4 KB block read computes <code>SHA-256(salt + data)</code> and walks the Merkle tree to the root hash stored in <code>vbmeta</code>. If any hash mismatches, the kernel either uses Reed-Solomon FEC (Forward Error Correction) or panics with <code>dm-verity: device corrupted</code>.</p>
+    <div class="cb"><div class="ch"><span class="cl">dm-verity table + status check</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code><span class="cm"># dm-verity table entry:</span>
+<span class="cm"># 0  2097152  verity  1  \</span>
+<span class="cm">#   /dev/block/mapper/system_a  \   &lt;-- data device</span>
+<span class="cm">#   /dev/block/mapper/system_a  \   &lt;-- hash device (tree appended)</span>
+<span class="cm">#   4096 4096 262144 262144  \      &lt;-- block/hash sizes</span>
+<span class="cm">#   sha256  &lt;root_hash&gt;  &lt;salt&gt;  2  &lt;fec_roots&gt;</span>
+
+adb shell dmsetup status system_a_verity
+<span class="cm"># → 0 2097152 verity V/V  (V=Verified, C=Corrupt)</span>
+
+adb shell getprop ro.boot.verifiedbootstate  <span class="cm"># → green</span></code></pre></div>
+  </div>
+  <div class="dmvstep" id="dmvs5">
+    <h4>Merkle hash tree — O(log N) per-block verification</h4>
+    <p>The hash tree is appended after data blocks in the partition. Each leaf = <code>SHA-256(salt + 4 KB block)</code>. Parent nodes hash 128 children (128 × 32 B = one 4 KB block). Only <code>log₂(N)</code> hashes need checking per block read.</p>
+    <div class="dw" style="margin:12px 0"><div class="dh"><span class="dt">Fig 2.2 — Merkle Hash Tree Visual</span><div class="da"><a class="db-btn" href="assets/diagrams/merkle-tree.png" download>⬇ PNG</a></div></div>
+    <div class="dbody" style="padding:12px"><img class="di" src="assets/diagrams/merkle-tree.png" style="width:100%;max-width:860px" alt="Merkle hash tree diagram: leaf hashes of 4KB data blocks, parent nodes hashing 128 leaves, root hash stored in vbmeta, verification path highlighted"/></div>
+    <p class="dcap">Fig 2.2 — Root hash lives in vbmeta (RSA-4096 signed). Verifying one block requires only O(log N) hash checks.</p></div>
+    <div class="cb"><div class="ch"><span class="cl">Merkle tree — build pseudo-code</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code><span class="kw">function</span> build_hash_tree(blocks, salt):
+  leaves = [SHA256(salt + blk) <span class="kw">for</span> blk <span class="kw">in</span> blocks]
+  <span class="kw">while</span> len(leaves) % <span class="nm">128</span>: leaves.append(<span class="st">b'\x00'</span>*<span class="nm">32</span>)
+  tree=[leaves]; cur=leaves
+  <span class="kw">while</span> len(cur)><span class="nm">1</span>:
+    nxt=[SHA256(salt+<span class="st">b''</span>.join(cur[i:i+<span class="nm">128</span>])) <span class="kw">for</span> i <span class="kw">in</span> range(<span class="nm">0</span>,len(cur),<span class="nm">128</span>)]
+    tree.insert(<span class="nm">0</span>,nxt); cur=nxt
+  <span class="kw">return</span> cur[<span class="nm">0</span>], tree  <span class="cm"># root_hash + tree</span></code></pre></div>
+  </div>
+  <div class="dmvstep" id="dmvs6">
+    <h4>Failure modes — what init does when dm-verity fails</h4>
+    <div class="cb"><div class="ch"><span class="cl">dm-verity failure commands</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+    <pre><code><span class="cm"># Kernel log — corruption detected:</span>
+<span class="cm"># [42.18] dm-verity: system_a: data block 12345 is corrupted</span>
+<span class="cm"># [42.19] Kernel panic - not syncing: dm-verity: device corrupted</span>
+
+<span class="cm"># Debug commands:</span>
+adb shell dmesg | grep "dm-verity"
+adb shell getprop ro.boot.verifymode        <span class="cm"># → enforcing</span>
+adb shell getprop ro.boot.verifiedbootstate <span class="cm"># → green</span>
+adb shell mount | grep system
+<span class="cm"># /dev/block/mapper/system_a_verity on /system type erofs (ro)</span>
+
+<span class="cm"># Debug/userdebug builds only:</span>
+adb root &amp;&amp; adb disable-verity &amp;&amp; adb reboot
+adb root &amp;&amp; adb remount</code></pre></div>
+    <div class="note nd"><span class="ni-icon">🚨</span><div class="nb"><strong>Safety consideration</strong><p>A dm-verity panic while driving must trigger a hardware-rendered safe state on a separate MCU before the reboot cycle completes — this is a functional-safety design constraint.</p></div></div>
+  </div>
+  <div class="dmvnav">
+    <button class="dmvbtn" id="dmv-prev" onclick="dmvN(-1)" disabled aria-label="Previous step">← Prev</button>
+    <div class="dmvprog" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="6"><div class="dmvfill" id="dmv-fill" style="width:16.7%"></div></div>
+    <span class="dmvctr" id="dmv-ctr" aria-live="polite">1 / 6</span>
+    <button class="dmvbtn" id="dmv-next" onclick="dmvN(1)" aria-label="Next step">Next →</button>
+  </div>
+</div>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 2.3 — Kernel to Init Sequence Diagram</span></div>
+<div class="dbody"><div id="kinit-seq-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 2.3 — Full populate_rootfs() sequence including dm-linear creation, AVB Merkle verify, and two execv transitions maintaining PID 1.</p></div>
+
+<h3 style="margin:32px 0 10px">init.rc Deep Dive — Triggers &amp; Service Classes</h3>
+<p>Second stage init parses <code>.rc</code> files from <code>/system/etc/init/</code>, <code>/vendor/etc/init/</code>, and <code>/odm/etc/init/</code>. Services start in class order: <strong>core → hal → main</strong>. class hal always starts before class main so all HALs are registered before any app opens them.</p>
+
+<div class="ircstage"><span class="ircbadge">trigger: early-init</span><div class="ircc"><h4>Minimal environment — before most filesystems</h4>
+<div class="cb"><div class="ch"><span class="cl">init.rc — early-init</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>on early-init
+    <span class="kw">start</span> ueventd       <span class="cm"># class core — creates /dev nodes</span>
+    <span class="kw">mount</span> cgroup2 none /sys/fs/cgroup nodev noexec nosuid</code></pre></div></div></div>
+
+<div class="ircstage"><span class="ircbadge">trigger: init</span><div class="ircc"><h4>Early mounts — persist &amp; metadata</h4>
+<div class="cb"><div class="ch"><span class="cl">init.qcom.rc — mount_all early</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>on init
+    <span class="kw">mount_all</span> /vendor/etc/fstab.qcom --early  <span class="cm"># persist + metadata</span>
+    <span class="kw">setprop</span> ro.hardware.gralloc msm</code></pre></div></div></div>
+
+<div class="ircstage"><span class="ircbadge">class: core</span><div class="ircc"><h4>Fundamental daemons — critical flag causes reboot on death</h4>
+<div class="cb"><div class="ch"><span class="cl">servicemanager + logd</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>service servicemanager /system/bin/servicemanager
+    class core animation
+    user system; group system readproc
+    critical        <span class="cm"># 4 deaths in 4 min → device reboot</span>
+    onrestart restart zygote
+
+service logd /system/bin/logd
+    class core
+    socket logd stream 0666 logd logd</code></pre></div></div></div>
+
+<div class="ircstage"><span class="ircbadge">class: hal</span><div class="ircc"><h4>Hardware Abstraction Layer daemons — start after core, before main</h4>
+<div class="cb"><div class="ch"><span class="cl">Display + Audio HAL services</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>service vendor.qti.display-hal /vendor/bin/hw/android.hardware.graphics.composer3-service.qti
+    class hal
+    user system; group graphics drmrpc
+    onrestart restart surfaceflinger
+
+service vendor.audio-hal /vendor/bin/hw/android.hardware.audio.service
+    class hal; user audioserver; group audio camera</code></pre></div></div></div>
+
+<div class="ircstage"><span class="ircbadge">class: main</span><div class="ircc"><h4>Zygote — starts ART and the entire framework</h4>
+<div class="cb"><div class="ch"><span class="cl">Zygote + debug adb commands</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>service zygote /system/bin/app_process64 -Xzygote /system/bin --zygote --start-system-server
+    class main; priority -20; user root
+    socket zygote stream 660 root system
+
+<span class="cm"># Debug — all service states:</span>
+adb shell getprop | grep "init.svc"
+<span class="cm"># init.svc.zygote=running  init.svc.logd=running</span>
+
+<span class="cm"># Watch class_start events live:</span>
+adb shell logcat | grep -E "class_start|ServiceManager|Zygote"
+
+<span class="cm"># Full ps listing after boot:</span>
+adb shell ps -A | grep -E "servicemanager|zygote|system_server"
+
+<span class="cm"># Check cmdline (slot, verifiedbootstate, etc.):</span>
+adb shell cat /proc/cmdline</code></pre></div></div></div>
+
+<div class="dw" style="margin-top:20px"><div class="dh"><span class="dt">Fig 2.4 — init.rc Class Start Sequence</span></div>
+<div class="dbody"><div id="kinit-class-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 2.4 — class hal must start before class main. servicemanager must start before any HAL (HALs register with it). This ordering is guaranteed by the class dependency system in init.</p></div>
+</div></section>
+<!-- ═══ PANEL 3 — AVB ════════════════════════════════════════════ -->
+<section role="tabpanel" id="panel-avb" aria-labelledby="tab-avb" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">03</span><h2>Android Verified Boot (AVB 2.0)</h2></div>
+<p>AVB provides a <strong>layered cryptographic chain of trust</strong> from immutable hardware fuses to per-block runtime verification. Every layer verifies the next; a break at any point prevents a green-state boot.</p>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 3.1 — AVB Chain of Trust Block Diagram</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/avb-block.png" download>⬇ PNG</a><button class="db-btn" onclick="zD('avbz',1.2)">＋</button><button class="db-btn" onclick="zD('avbz',.83)">－</button><button class="db-btn" onclick="rzD('avbz')">⊡</button></div></div>
+<div class="dbody zw"><div class="zi" id="avbz"><img class="di" src="assets/diagrams/avb-block.png" style="width:100%;max-width:860px" alt="AVB chain of trust: eFuse root of trust, PBL-XBL-ABL signature chain, libavb in ABL, First Stage Init dm-verity, RPMB rollback protection, runtime dm-verity on every block read"/></div></div>
+<p class="dcap">Fig 3.1 — eFuse is the immutable root. RPMB prevents rollback. dm-verity provides continuous runtime verification. Chain partition descriptors allow Google and the SoC vendor to manage their own signing keys independently.</p></div>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 3.2 — Merkle Hash Tree — dm-verity Visual</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/merkle-tree.png" download>⬇ PNG</a></div></div>
+<div class="dbody"><img class="di" src="assets/diagrams/merkle-tree.png" style="width:100%;max-width:860px" alt="Merkle tree diagram: root hash in vbmeta, level 1 parent nodes, level 2 parent nodes, leaf hashes for each 4KB data block, verification path highlighted"/></div>
+<p class="dcap">Fig 3.2 — Merkle tree built from data blocks. Root hash stored in vbmeta (RSA-4096 signed). Verifying one block requires only O(log₂ N) hash comparisons — approximately 18 for a 1 GB partition.</p></div>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 3.3 — ABL → FSI → dm-verity Verification Sequence</span></div>
+<div class="dbody"><div id="avb-seq-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 3.3 — boot/vendor_boot use full upfront SHA-256 (small partitions). system/vendor use lazy Merkle tree verification per block read at runtime (too large for full upfront hash).</p></div>
+
+<details class="coll" open><summary>How ABL Verifies vbmeta — Interactive Walkthrough</summary>
+<div class="coll-body">
+<p>ABL runs <code>libavb</code> which performs this sequence for every boot:</p>
+<div class="cb"><div class="ch"><span class="cl">libavb verification flow (pseudo-code)</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code><span class="cm"># Step 1: Load vbmeta from partition</span>
+vbmeta_bytes = read_partition(<span class="st">"vbmeta"</span>)
+
+<span class="cm"># Step 2: Verify RSA-4096 signature against eFuse OEM key</span>
+oem_key_hash = read_efuse(OEM_KEY_HASH_REGISTER)
+<span class="kw">if</span> SHA256(vbmeta.auth_block.pubkey) != oem_key_hash:
+    <span class="kw">return</span> AVB_SLOT_VERIFY_RESULT_ERROR_PUBLIC_KEY_REJECTED
+
+<span class="cm"># Step 3: Check RPMB rollback index (via TrustZone SMC)</span>
+stored_idx = tz_smc_read_rpmb_rollback_index(slot=<span class="nm">0</span>)
+<span class="kw">if</span> vbmeta.rollback_index &lt; stored_idx:
+    <span class="kw">return</span> AVB_SLOT_VERIFY_RESULT_ERROR_ROLLBACK_INDEX
+
+<span class="cm"># Step 4: Hash verify boot + vendor_boot (full partitions)</span>
+<span class="kw">for</span> desc <span class="kw">in</span> vbmeta.hash_descriptors:
+    actual = SHA256(read_partition(desc.partition_name))
+    <span class="kw">if</span> actual != desc.digest: <span class="kw">return</span> ERROR_HASH_MISMATCH
+
+<span class="cm"># Step 5: Set kernel cmdline for init to read</span>
+append_cmdline(<span class="st">f"androidboot.verifiedbootstate=green"</span>)
+append_cmdline(<span class="st">f"androidboot.vbmeta.hash_alg=sha256"</span>)
+
+<span class="cm"># Step 6: Post-boot — update RPMB permanently (monotonic!)</span>
+<span class="kw">if</span> vbmeta.rollback_index > stored_idx:
+    tz_smc_write_rpmb_rollback_index(slot=<span class="nm">0</span>, new=vbmeta.rollback_index)</code></pre></div>
+</div></details>
+
+<details class="coll"><summary>vbmeta Structure + avbtool Example Commands</summary>
+<div class="coll-body">
+<p>A vbmeta image is ~64 KB: an <em>authentication block</em> (RSA signature + SHA-256 of aux block) and an <em>auxiliary block</em> (OEM public key + descriptor array).</p>
+<div class="cb"><div class="ch"><span class="cl">avbtool — inspect vbmeta (sample output)</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>adb shell dd if=/dev/block/by-name/vbmeta of=/tmp/vbmeta.img bs=65536 count=1
+adb pull /tmp/vbmeta.img
+avbtool info_image --image vbmeta.img
+
+<span class="cm"># VBMeta image version: 1.3</span>
+<span class="cm"># Public key (sha1):    2c40b2c7...</span>
+<span class="cm"># Rollback Index:       42</span>
+<span class="cm"># Descriptors:</span>
+<span class="cm">#   Hash descriptor:</span>
+<span class="cm">#     Image Name:  boot</span>
+<span class="cm">#     Hash Algorithm: sha256</span>
+<span class="cm">#     Digest:      a3b4c5d6...</span>
+<span class="cm">#   HashTree descriptor:</span>
+<span class="cm">#     Image Name:  system</span>
+<span class="cm">#     Tree Offset: 1073741824</span>
+<span class="cm">#     Root Digest: 7e8f9a0b...</span>
+<span class="cm">#     FEC num roots: 2</span>
+<span class="cm">#   Chain Partition descriptor:</span>
+<span class="cm">#     Partition Name: vbmeta_system</span>
+<span class="cm">#     Rollback Index Location: 1</span>
+<span class="cm">#     Public key (sha1): 3d4e5f60...</span></code></pre></div>
+<div class="cb"><div class="ch"><span class="cl">avbtool — sign vbmeta + verify</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>avbtool make_vbmeta_image \
+  --output vbmeta.img \
+  --key oem_private_key.pem --algorithm SHA256_RSA4096 \
+  --rollback_index 42 \
+  --include_descriptors_from_image boot.img \
+  --chain_partition vbmeta_system:1:google_pubkey.bin \
+  --chain_partition vbmeta_vendor:2:vendor_pubkey.bin
+
+avbtool verify_image --image system.img
+<span class="cm"># Verification OK. Hash tree offset: 1073741824</span>
+
+<span class="cm"># On device — check AVB state:</span>
+fastboot getvar verified-boot-state   <span class="cm"># → green</span>
+fastboot getvar unlocked              <span class="cm"># → no</span></code></pre></div>
+
+<table class="tbl" aria-label="AVB boot states"><thead><tr><th>State</th><th>Condition</th><th>dm-verity</th><th>Warning</th></tr></thead>
+<tbody>
+<tr><td>🟢 GREEN</td><td>Valid sig, locked BL, rollback OK</td><td>Enforced</td><td>None</td></tr>
+<tr><td>🟡 YELLOW</td><td>Custom OEM key, locked BL</td><td>Enforced</td><td>10 s splash</td></tr>
+<tr><td>🟠 ORANGE</td><td>Bootloader unlocked</td><td>Disabled</td><td>10 s splash</td></tr>
+<tr><td>🔴 RED</td><td>Signature mismatch / hash failure</td><td>N/A</td><td>Refuses boot</td></tr>
+</tbody></table>
+</div></details>
+</div></section>
+
+<!-- ═══ PANEL 4 — RECOVERY ════════════════════════════════════════ -->
+<section role="tabpanel" id="panel-recovery" aria-labelledby="tab-recovery" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">04</span><h2>Recovery Flow</h2></div>
+<p>When you run <code>adb reboot recovery</code>, Android writes the <strong>BCB (Bootloader Control Block)</strong> to the <code>misc</code> partition before a SoC reset. BCB persists in flash while RAM is zeroed on reset — it is the only reliable communication channel between Android and the bootloader across a power cycle.</p>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 4.1 — misc Partition Layout &amp; BCB Structure</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/bcb-visual.png" download>⬇ PNG</a></div></div>
+<div class="dbody"><img class="di" src="assets/diagrams/bcb-visual.png" style="width:100%;max-width:860px" alt="misc partition BCB layout: 6 fields from offset 0x0000 to 0x0380 — command, status, recovery args, stage, slot_suffix, reserved. Each field shown with byte size and description."/></div>
+<p class="dcap">Fig 4.1 — BCB occupies the first 1024 bytes of misc. The <code>command</code> field at offset 0x0000 drives the bootloader's boot decision. Recovery clears it on completion.</p></div>
+
+<details class="coll" open><summary>BCB Field Reference Table</summary>
+<div class="coll-body">
+<div class="bcb" role="table" aria-label="BCB structure">
+  <div class="bcbr"><div class="bco">0x0000</div><div class="bcf">command[32]</div><div class="bcsz">32 B</div><div class="bcd">"boot-recovery" | "bootonce-bootloader" | "" (normal boot)</div></div>
+  <div class="bcbr"><div class="bco">0x0020</div><div class="bcf">status[32]</div><div class="bcsz">32 B</div><div class="bcd">Recovery writes result here after completing: "no-op" | "error:N" | "success"</div></div>
+  <div class="bcbr"><div class="bco">0x0040</div><div class="bcf">recovery[768]</div><div class="bcsz">768 B</div><div class="bcd">Extra args for recovery: "--wipe_data\n--locale=en_US\n" etc.</div></div>
+  <div class="bcbr"><div class="bco">0x0340</div><div class="bcf">stage[32]</div><div class="bcsz">32 B</div><div class="bcd">Multi-stage wipe progress: "1/3", "2/3", "3/3"</div></div>
+  <div class="bcbr"><div class="bco">0x0360</div><div class="bcf">slot_suffix[32]</div><div class="bcsz">32 B</div><div class="bcd">Active A/B slot written by ABL: "_a" or "_b"</div></div>
+  <div class="bcbr"><div class="bco">0x0380</div><div class="bcf">reserved[192]</div><div class="bcsz">192 B</div><div class="bcd">Padding to 1024 B. VAB merge_status stored at higher offsets.</div></div>
+</div>
+<div class="cb"><div class="ch"><span class="cl">BCB read / write / verify</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code><span class="cm"># Read command field (first 32 bytes)</span>
+adb shell dd if=/dev/block/by-name/misc bs=1 count=32 2>/dev/null | strings
+<span class="cm"># Normal: (empty)     Recovery: boot-recovery</span>
+
+<span class="cm"># Read recovery args field (bytes 64–831)</span>
+adb shell dd if=/dev/block/by-name/misc bs=1 skip=64 count=768 2>/dev/null | strings
+
+<span class="cm"># Manually trigger recovery (root required):</span>
+adb root
+echo -n 'boot-recovery' | adb shell dd of=/dev/block/by-name/misc bs=1 count=14
+adb reboot
+
+<span class="cm"># Post-recovery — verify BCB was cleared:</span>
+adb shell dd if=/dev/block/by-name/misc bs=1 count=32 2>/dev/null | hexdump | head
+<span class="cm"># Should be all zeros: 00000000  00 00 00 00 …</span></code></pre></div>
+</div></details>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 4.2 — Recovery Trigger Block Diagram</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/recovery-block.png" download>⬇ PNG</a><button class="db-btn" onclick="zD('recz',1.2)">＋</button><button class="db-btn" onclick="zD('recz',.83)">－</button><button class="db-btn" onclick="rzD('recz')">⊡</button></div></div>
+<div class="dbody zw"><div class="zi" id="recz"><img class="di" src="assets/diagrams/recovery-block.png" style="width:100%;max-width:860px" alt="Recovery flow: adb client sends reboot recovery to adbd, adbd sets sys.powerctl, init PID 1 stops services and writes BCB to misc, SoC resets, ABL reads BCB and boots recovery OS or normal Android"/></div></div>
+<p class="dcap">Fig 4.2 — BCB is written before the SoC reset and read by the bootloader after reset. Recovery OS clears the BCB command field on completion.</p></div>
+
+<div class="dw"><div class="dh"><span class="dt">Fig 4.3 — Full Recovery Lifecycle Sequence</span></div>
+<div class="dbody"><div id="rec-seq-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 4.3 — On Android 11+ (VAB), the recovery OS runs using the same kernel as normal Android. The bootloader adds <code>androidboot.force_normal_boot=0</code> to the kernel command line to signal recovery mode.</p></div>
+
+<details class="coll"><summary>/system/bin/recovery — Contents, Responsibilities &amp; Example Logs</summary>
+<div class="coll-body">
+<p>On VAB (Android 11+), the recovery binary lives at <code>/system/bin/recovery</code> and is exec'd by first stage init. It runs with no Android framework — no Binder, no Zygote, no system services. RecoveryUI writes directly to the framebuffer.</p>
+<div class="cb"><div class="ch"><span class="cl">Recovery capabilities</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code><span class="cm"># 1. OTA package installation</span>
+<span class="cm">#    - Verifies package signature via /system/etc/security/otacerts.zip</span>
+<span class="cm">#    - Runs update_binary (update_engine_sideload) inside the OTA zip</span>
+<span class="cm">#    - Verifies block hashes per update_metadata.pb</span>
+
+<span class="cm"># 2. Factory reset (--wipe_data)</span>
+<span class="cm">#    - Formats /data (mke2fs or erase_blk)</span>
+<span class="cm">#    - Explicitly SKIPS /mnt/vendor/persist and FRP partition</span>
+<span class="cm">#    - Clears /metadata/ota/ (VAB snapshot state)</span>
+
+<span class="cm"># 3. ADB sideload — minimal adbd in sideload-only mode</span>
+adb reboot sideload
+adb sideload ota_package.zip
+
+<span class="cm"># 4. RecoveryUI — direct framebuffer drawing (no SurfaceFlinger)</span></code></pre></div>
+<div class="cb"><div class="ch"><span class="cl">Example recovery.log output</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code><span class="cm"># Accessible at /data/misc/recovery/last_log after reboot:</span>
+adb shell cat /data/misc/recovery/last_log
+
+<span class="cm"># Sample output:</span>
+I/A:system/bin/recovery: Starting recovery (pid 1) on Thu Mar 19 08:30:00 2026
+I/A: BCB command: boot-recovery
+I/A: BCB recovery: --wipe_data\n
+I/A: Wiping data...
+I/A: Formatting /dev/block/by-name/userdata
+I/A: mke2fs -t ext4 /dev/block/by-name/userdata
+I/A: Format succeeded.
+I/A: Writing BCB status=success command=
+I/A: Reboot requested: reboot,
+I/A: Rebooting with target ''
+
+<span class="cm"># Check OTA installation log:</span>
+adb shell cat /data/misc/recovery/last_install</code></pre></div>
+</div></details>
+</div></section>
+<!-- ═══ PANEL 5 — HLOS ════════════════════════════════════════════ -->
+<section role="tabpanel" id="panel-hlos" aria-labelledby="tab-hlos" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">05</span><h2>HLOS vs Non-HLOS</h2></div>
+<p>A modern automotive SoC contains <strong>8–10 independent processors</strong> on one die. Android/Linux (HLOS) is one of them. The others are NON-HLOS subsystems with hard real-time requirements that Linux cannot satisfy.</p>
+<div class="dw"><div class="dh"><span class="dt">Fig 5.1 — SoC Subsystem Layout</span>
+<div class="da"><a class="db-btn" href="assets/diagrams/hlos-block.png" download>⬇ PNG</a><button class="db-btn" onclick="zD('hlosz',1.2)">＋</button><button class="db-btn" onclick="zD('hlosz',.83)">－</button><button class="db-btn" onclick="rzD('hlosz')">⊡</button></div></div>
+<div class="dbody zw"><div class="zi" id="hlosz"><img class="di" src="assets/diagrams/hlos-block.png" style="width:100%;max-width:860px" alt="SoC subsystem map: HLOS domain with ARM Cortex-A cores Linux GKI TrustZone EL3, NON-HLOS processors MPSS ADSP CDSP SLPI AOP Venus connected via System Interconnect with XPU memory isolation"/></div></div>
+<p class="dcap">Fig 5.1 — TrustZone shares ARM Cortex-A cores with HLOS at EL3. All NON-HLOS processors are physically separate cores. XPU hardware enforces DDR isolation after PIL loading.</p></div>
+<div class="dw"><div class="dh"><span class="dt">Fig 5.2 — NON-HLOS PIL Loading Sequence</span></div>
+<div class="dbody"><div id="hlos-seq-wrap" class="mermaid-wrap"></div></div>
+<p class="dcap">Fig 5.2 — TrustZone and AOP are loaded by XBL before Linux. MPSS/ADSP/CDSP are loaded by Linux PIL, authenticated by TrustZone via SMC calls. XPU prevents the Linux kernel from reading/writing subsystem DDR.</p></div>
+<h3 style="margin:26px 0 10px">Subsystem Reference</h3>
+<div class="ssg">
+  <div class="ssc"><span class="ssicon">📡</span><div class="ssname">MPSS (Modem)</div><div class="ssproc">Hexagon QDSP6 — AMSS RTOS</div><p class="ssdesc">5G NR / 4G LTE protocol stack. 1 ms subframe timing impossible in Linux. FCC mandates isolation from user code.</p><div class="ssind"><div class="ssidot" style="background:var(--orange)"></div><span class="ssilbl">PIL loaded · modem_a/b</span></div></div>
+  <div class="ssc"><span class="ssicon">🔊</span><div class="ssname">ADSP (Audio)</div><div class="ssproc">Hexagon QDSP6 — QuRT RTOS</div><p class="ssdesc">Audio encode/decode, AEC, always-on voice detection at ~1 mW. Enables wake-word while AP cores are in deep sleep.</p><div class="ssind"><div class="ssidot" style="background:var(--blue)"></div><span class="ssilbl">PIL loaded · adsp_a/b</span></div></div>
+  <div class="ssc"><span class="ssicon">🧠</span><div class="ssname">CDSP (Compute)</div><div class="ssproc">Hexagon HVX — QuRT RTOS</div><p class="ssdesc">ML inference via SNPE/QNN. Driver Monitoring, occupant detection, ADAS classification.</p><div class="ssind"><div class="ssidot" style="background:var(--green)"></div><span class="ssilbl">PIL loaded · cdsp_a/b</span></div></div>
+  <div class="ssc"><span class="ssicon">📐</span><div class="ssname">SLPI (Sensor)</div><div class="ssproc">Hexagon low-power — QuRT</div><p class="ssdesc">IMU, gyroscope, accelerometer always-on at 1 mW. Critical for automotive dynamics and sensor fusion.</p><div class="ssind"><div class="ssidot" style="background:var(--purple)"></div><span class="ssilbl">PIL loaded · slpi_a/b</span></div></div>
+  <div class="ssc"><span class="ssicon">⚡</span><div class="ssname">AOP / RPM</div><div class="ssproc">ARM Cortex-M4 — bare metal</div>
+    <p class="ssdesc">Clock and voltage arbiter for the entire SoC. Always-on — manages sleep/wake for all processors. Handles ignition wakeup in automotive.</p>
+    <div class="ssind"><div class="ssidot" style="background:var(--amber)"></div><span class="ssilbl">XBL loaded · always-on</span></div>
+    <div class="note ni2" style="margin-top:8px;padding:7px 10px"><span class="ni-icon" style="font-size:.8rem">ℹ️</span><div class="nb"><p style="font-size:.72rem;margin:0">AOP starts before Linux and runs for the device's entire lifetime. No runtime loading phase to show.</p></div></div>
+  </div>
+  <div class="ssc"><span class="ssicon">🔐</span><div class="ssname">TrustZone (QSEE)</div><div class="ssproc">ARM EL3 — Secure World</div><p class="ssdesc">RPMB key custodian. KeyMint (Android Keystore), Widevine DRM L1, HDCP 2.x, biometric template matching. Unreachable from kernel bugs.</p><div class="ssind"><div class="ssidot" style="background:var(--purple)"></div><span class="ssilbl">XBL loaded · tz_a/b</span></div></div>
+</div>
+<h3 style="margin:22px 0 10px">Comparison Table</h3>
+<div style="overflow-x:auto"><table class="tbl" aria-label="HLOS vs Non-HLOS">
+<thead><tr><th>Attribute</th><th>HLOS (Android)</th><th>NON-HLOS (Subsystems)</th></tr></thead>
+<tbody>
+<tr><td>Processor</td><td>ARM Cortex-A</td><td>Hexagon QDSP6 / ARM-M4 / ARM EL3</td></tr>
+<tr><td>OS</td><td>Linux + Android</td><td>AMSS / QuRT RTOS / bare metal</td></tr>
+<tr><td>Real-time?</td><td><span class="bn">Soft RT only</span></td><td><span class="by">Hard RT — μs precision</span></td></tr>
+<tr><td>Loaded by</td><td>ABL → kernel exec chain</td><td>XBL (TZ/AOP) or Linux PIL</td></tr>
+<tr><td>Memory protection</td><td>MMU / page tables</td><td>XPU (hardware, TZ-configured)</td></tr>
+<tr><td>IPC with HLOS</td><td>Binder / AIDL</td><td>QMI / FastRPC / APR / Glink / SMEM</td></tr>
+<tr><td>Crash recovery</td><td>Watchdog → reboot</td><td>SSR (Subsystem Restart) → PIL reload</td></tr>
+</tbody></table></div>
+<div class="cb"><div class="ch"><span class="cl">adb — monitor subsystem state</span><button class="cp-btn" onclick="cp(this)">Copy</button></div>
+<pre><code>adb shell cat /sys/bus/msm_subsys/devices/subsys0/name   <span class="cm"># → modem</span>
+adb shell cat /sys/bus/msm_subsys/devices/subsys0/state  <span class="cm"># → ONLINE</span>
+adb shell dmesg | grep -E "PIL|MPSS|ADSP|remoteproc|subsys"
+adb shell ls /dev/socket/qmux_radio/  <span class="cm"># modem QMI endpoints</span></code></pre></div>
+</div></section>
+
+<!-- ═══ PANEL 6 — ANDROID IMAGES ════════════════════════════════ -->
+<section role="tabpanel" id="panel-images" aria-labelledby="tab-images" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">06</span><h2>Android Images &amp; Partitions</h2></div>
+<p>Every Android partition has a specific owner, purpose, and lifecycle. The animated map shows access order by boot stage. Click any card for details including debug commands.</p>
+<div class="dw"><div class="dh"><span class="dt">Animated Map — Partitions by Boot Stage (hover for description)</span><div class="da"><a class="db-btn" href="assets/diagrams/images-block.png" download>⬇ PNG</a></div></div>
+<div class="dbody" style="padding-top:12px;padding-bottom:12px">
+<div class="ptl" id="ptl" aria-label="Partitions by boot stage">
+  <div class="ptlrow"><div class="ptllbl">XBL loads</div><div class="ptlblks">
+    <span class="ptlb ca" onclick="showP('modem')" title="tz — TrustZone EL3 secure world">tz_a/b</span>
+    <span class="ptlb ca" onclick="showP('modem')" title="aop — always-on power manager">aop_a/b</span>
+    <span class="ptlb ca" title="xbl — UEFI bootloader loaded by PBL">xbl_a/b</span>
+    <span class="ptlb ca" title="abl — Android Bootloader loaded by XBL">abl_a/b</span>
+  </div></div><div class="ptldiv"></div>
+  <div class="ptlrow"><div class="ptllbl">ABL loads</div><div class="ptlblks">
+    <span class="ptlb ca" onclick="showP('boot')" title="boot — GKI kernel + generic ramdisk">boot_a/b</span>
+    <span class="ptlb ca" onclick="showP('vendor_boot')" title="vendor_boot — vendor ramdisk + DTB">vendor_boot</span>
+    <span class="ptlb ca" onclick="showP('dtbo')" title="dtbo — Device Tree Overlays for HW variant select">dtbo_a/b</span>
+    <span class="ptlb cp" onclick="showP('vbmeta')" title="vbmeta — AVB root of trust">vbmeta</span>
+    <span class="ptlb cp" onclick="showP('vbmeta')" title="vbmeta_system — Google-signed descriptors">vbmeta_system</span>
+    <span class="ptlb cp" onclick="showP('vbmeta')" title="vbmeta_vendor — vendor-signed descriptors">vbmeta_vendor</span>
+    <span class="ptlb cg" onclick="showP('misc')" title="misc — BCB at offset 0x0000">misc(BCB)</span>
+  </div></div><div class="ptldiv"></div>
+  <div class="ptlrow"><div class="ptllbl">1st Stage Init</div><div class="ptlblks">
+    <span class="ptlb cs" onclick="showP('system')" title="system — Core AOSP, RO via dm-verity">system</span>
+    <span class="ptlb cs" onclick="showP('system_ext')" title="system_ext — GMS + framework extensions">system_ext</span>
+    <span class="ptlb cv" onclick="showP('vendor')" title="vendor — SoC HALs and BSP">vendor</span>
+    <span class="ptlb cv" onclick="showP('odm')" title="odm — ODM Tier-1 specific HALs">odm</span>
+  </div></div><div class="ptldiv"></div>
+  <div class="ptlrow"><div class="ptllbl">2nd Stage (early)</div><div class="ptlblks">
+    <span class="ptlb cm" onclick="showP('persist')" title="persist — factory calibration NEVER wiped">persist ⚠</span>
+    <span class="ptlb cg" onclick="showP('metadata')" title="metadata — FBE keys and VAB OTA state">metadata</span>
+    <span class="ptlb cs" onclick="showP('system_dlkm')" title="system_dlkm — GKI extension .ko modules">system_dlkm</span>
+    <span class="ptlb cv" onclick="showP('vendor_dlkm')" title="vendor_dlkm — hardware driver .ko files">vendor_dlkm</span>
+    <span class="ptlb cv" onclick="showP('odm')" title="odm_dlkm — ODM-specific .ko files">odm_dlkm</span>
+  </div></div><div class="ptldiv"></div>
+  <div class="ptlrow"><div class="ptllbl">2nd Stage (late)</div><div class="ptlblks">
+    <span class="ptlb cg" title="userdata — FBE encrypted user data">userdata</span>
+    <span class="ptlb cs" onclick="showP('product')" title="product — OEM/carrier apps and overlays">product</span>
+    <span class="ptlb cm" onclick="showP('frp')" title="frp — Factory Reset Protection NEVER wiped">frp ⚠</span>
+  </div></div><div class="ptldiv"></div>
+  <div class="ptlrow"><div class="ptllbl">PIL (via kernel)</div><div class="ptlblks">
+    <span class="ptlb cn" onclick="showP('modem')" title="modem — MPSS AMSS RTOS XPU protected">modem</span>
+    <span class="ptlb cn" onclick="showP('modem')" title="adsp — Audio DSP QuRT RTOS">adsp</span>
+    <span class="ptlb cn" onclick="showP('modem')" title="cdsp — Compute DSP for ML inference">cdsp</span>
+    <span class="ptlb cn" onclick="showP('modem')" title="slpi — Sensor processor">slpi</span>
+    <span class="ptlb cn" onclick="showP('modem')" title="venus — Video processor firmware">venus</span>
+  </div></div>
+</div></div></div>
+<h3 style="margin:24px 0 10px">Partition Cards — Click to Expand Detail</h3>
+<div class="pg" role="list">
+  <div class="pc pca" role="listitem" tabindex="0" id="pci-boot" onclick="showP('boot')" onkeydown="if(event.key==='Enter')showP('boot')"><div class="pn">boot</div><div class="po">Google + OEM</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">AVB full-hash</span><span class="ptag">Not in super</span></div></div>
+  <div class="pc pca" role="listitem" tabindex="0" id="pci-vendor_boot" onclick="showP('vendor_boot')" onkeydown="if(event.key==='Enter')showP('vendor_boot')"><div class="pn">vendor_boot</div><div class="po">Vendor / OEM</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">DTB inside</span></div></div>
+  <div class="pc pca" role="listitem" tabindex="0" id="pci-dtbo" onclick="showP('dtbo')" onkeydown="if(event.key==='Enter')showP('dtbo')"><div class="pn">dtbo</div><div class="po">Vendor / OEM</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">HW variant</span></div></div>
+  <div class="pc pca" role="listitem" tabindex="0" id="pci-vbmeta" onclick="showP('vbmeta')" onkeydown="if(event.key==='Enter')showP('vbmeta')"><div class="pn">vbmeta*</div><div class="po">OEM / Google / Vendor</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">AVB root</span></div></div>
+  <div class="pc pcs" role="listitem" tabindex="0" id="pci-system" onclick="showP('system')" onkeydown="if(event.key==='Enter')showP('system')"><div class="pn">system</div><div class="po">Google</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">In super</span><span class="ptag">dm-verity</span></div></div>
+  <div class="pc pcs" role="listitem" tabindex="0" id="pci-system_ext" onclick="showP('system_ext')" onkeydown="if(event.key==='Enter')showP('system_ext')"><div class="pn">system_ext</div><div class="po">Google / OEM</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">In super</span></div></div>
+  <div class="pc pcs" role="listitem" tabindex="0" id="pci-system_dlkm" onclick="showP('system_dlkm')" onkeydown="if(event.key==='Enter')showP('system_dlkm')"><div class="pn">system_dlkm</div><div class="po">Google</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">GKI .ko</span></div></div>
+  <div class="pc pcv" role="listitem" tabindex="0" id="pci-vendor" onclick="showP('vendor')" onkeydown="if(event.key==='Enter')showP('vendor')"><div class="pn">vendor</div><div class="po">SoC Vendor</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">In super</span></div></div>
+  <div class="pc pcv" role="listitem" tabindex="0" id="pci-vendor_dlkm" onclick="showP('vendor_dlkm')" onkeydown="if(event.key==='Enter')showP('vendor_dlkm')"><div class="pn">vendor_dlkm</div><div class="po">SoC Vendor</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">.ko files</span></div></div>
+  <div class="pc pcv" role="listitem" tabindex="0" id="pci-odm" onclick="showP('odm')" onkeydown="if(event.key==='Enter')showP('odm')"><div class="pn">odm / odm_dlkm</div><div class="po">ODM (Tier-1)</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">In super</span></div></div>
+  <div class="pc pcs" role="listitem" tabindex="0" id="pci-product" onclick="showP('product')" onkeydown="if(event.key==='Enter')showP('product')"><div class="pn">product</div><div class="po">OEM / Carrier</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">In super</span></div></div>
+  <div class="pc pcm" role="listitem" tabindex="0" id="pci-misc" onclick="showP('misc')" onkeydown="if(event.key==='Enter')showP('misc')"><div class="pn">misc</div><div class="po">AOSP</div><div class="ptags"><span class="ptag">Not A/B</span><span class="ptag">BCB raw</span></div></div>
+  <div class="pc pcm" role="listitem" tabindex="0" id="pci-persist" onclick="showP('persist')" onkeydown="if(event.key==='Enter')showP('persist')"><div class="pn">persist</div><div class="po">Vendor / OEM</div><div class="ptags"><span class="ptag">Not A/B</span><span class="ptag">⚠ NEVER wiped</span></div></div>
+  <div class="pc pcm" role="listitem" tabindex="0" id="pci-metadata" onclick="showP('metadata')" onkeydown="if(event.key==='Enter')showP('metadata')"><div class="pn">metadata</div><div class="po">AOSP</div><div class="ptags"><span class="ptag">Not A/B</span><span class="ptag">FBE keys</span></div></div>
+  <div class="pc pcm" role="listitem" tabindex="0" id="pci-frp" onclick="showP('frp')" onkeydown="if(event.key==='Enter')showP('frp')"><div class="pn">frp</div><div class="po">Google (GMS)</div><div class="ptags"><span class="ptag">Not A/B</span><span class="ptag">⚠ NEVER wiped</span></div></div>
+  <div class="pc pcn" role="listitem" tabindex="0" id="pci-modem" onclick="showP('modem')" onkeydown="if(event.key==='Enter')showP('modem')"><div class="pn">modem/adsp/cdsp…</div><div class="po">NON-HLOS</div><div class="ptags"><span class="ptag">A/B</span><span class="ptag">PIL</span><span class="ptag">XPU</span></div></div>
+</div>
+<div id="pd" aria-live="polite" tabindex="-1"><div id="pd-content"></div></div>
+</div></section>
+
+<!-- ═══ PANEL 7 — FAQ ════════════════════════════════════════════ -->
+<section role="tabpanel" id="panel-faq" aria-labelledby="tab-faq" tabindex="0">
+<div class="wrap">
+<div class="sh"><span class="sn">07</span><h2>FAQ &amp; Troubleshooting</h2></div>
+<div class="g2" style="gap:30px;align-items:start">
+<div>
+<h3 style="margin-bottom:14px">Frequently Asked Questions</h3>
+<div class="faq" id="fq1"><div class="faqq" onclick="fq('fq1')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq1')" role="button" aria-expanded="false"><span class="faqn">Q1</span><span class="faqt">Why does PID 1 survive three execv calls?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><code>execv()</code> replaces the process image in-place — the PID stays the same but the binary changes. Android uses this three times: kernel → first-stage, first-stage → selinux_setup, selinux_setup → second_stage. PID 1 must remain stable because the kernel delivers SIGCHLD for all orphaned processes to it. Traditional Linux uses <code>switch_root</code> instead; Android avoids it to preserve the process tree.</p></div></div>
+<div class="faq" id="fq2"><div class="faqq" onclick="fq('fq2')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq2')" role="button" aria-expanded="false"><span class="faqn">Q2</span><span class="faqt">Can you mount /system read-write with dm-verity enabled?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><strong>No.</strong> dm-verity is fundamentally incompatible with writes. Every block write changes its SHA-256, so the next read fails hash verification. On production builds <code>/system</code> is always <code>MS_RDONLY</code>. On userdebug/eng builds: <code>adb root &amp;&amp; adb disable-verity &amp;&amp; adb reboot</code> or <code>adb root &amp;&amp; adb remount</code> disables verity for the session.</p></div></div>
+<div class="faq" id="fq3"><div class="faqq" onclick="fq('fq3')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq3')" role="button" aria-expanded="false"><span class="faqn">Q3</span><span class="faqt">What is the difference between vendor_dlkm and system_dlkm?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><strong>vendor_dlkm</strong> contains SoC vendor-owned, vendor-signed hardware driver <code>.ko</code> files (display, audio DSP, GPU, camera, CAN bus). Verified by <code>vbmeta_vendor</code>. <strong>system_dlkm</strong> contains Google-owned, Google-signed GKI extension modules (<code>fuse.ko</code>, <code>incremental_fs.ko</code>, <code>dm_user.ko</code>). Verified by <code>vbmeta_system</code>. The split allows each party to update their modules independently via the GKI KMI contract without the other needing to rebuild.</p></div></div>
+<div class="faq" id="fq4"><div class="faqq" onclick="fq('fq4')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq4')" role="button" aria-expanded="false"><span class="faqn">Q4</span><span class="faqt">Why does persist never get wiped, and what happens if you do?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><code>persist</code> stores per-device factory-measured calibration: WiFi RF offsets, BT NV items, display colour LUT, gyroscope zero-offsets. This is measured on each unit using specialised factory test equipment. Wiping it is catastrophic: WiFi may violate RF regulations, display colours are wrong, sensors drift. Recovery explicitly skips <code>persist</code>. Restoring it requires returning the device to factory calibration equipment.</p></div></div>
+<div class="faq" id="fq5"><div class="faqq" onclick="fq('fq5')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq5')" role="button" aria-expanded="false"><span class="faqn">Q5</span><span class="faqt">How does GKI let Google ship kernel patches without OEM involvement?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p>Before GKI, each OEM shipped a monolithic kernel with vendor drivers compiled in. A CVE patch required: Google patch → vendor backport → OEM integrate → full regression → OTA (6–12 months). GKI splits the kernel into: (1) a <strong>GKI core</strong> in <code>boot</code>, maintained by Google with a stable <strong>KMI</strong>, and (2) <strong>vendor modules</strong> in <code>vendor_dlkm</code> compiled by the SoC vendor against the stable KMI. Because KMI is stable, Google can patch the kernel in days without the vendor recompiling <code>.ko</code> files.</p></div></div>
+<div class="faq" id="fq6"><div class="faqq" onclick="fq('fq6')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq6')" role="button" aria-expanded="false"><span class="faqn">Q6</span><span class="faqt">What is the difference between HIDL and AIDL HALs?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><strong>HIDL</strong> (HAL Interface Definition Language) was introduced in Android 8 (Treble). It uses a separate Binder domain (<code>hwbinder</code>) and is declared in <code>.hal</code> files compiled by <code>hidl-gen</code>. <strong>AIDL</strong> was extended to support vendor HALs in Android 11 and became the <em>preferred</em> HAL mechanism from Android 12 onward. AIDL uses the same Binder as the rest of Android and supports in-process HALs. New HALs should use AIDL; existing HIDL HALs are deprecated but still functional.</p></div></div>
+<div class="faq" id="fq7"><div class="faqq" onclick="fq('fq7')" tabindex="0" onkeydown="if(event.key==='Enter')fq('fq7')" role="button" aria-expanded="false"><span class="faqn">Q7</span><span class="faqt">What is VAB (Virtual A/B) and how does it differ from traditional A/B?</span><span class="faqch">▼</span></div>
+<div class="faqa"><p><strong>Traditional A/B</strong> duplicates every partition physically — system_a and system_b both exist full-size simultaneously, doubling storage cost. <strong>Virtual A/B</strong> (Android 11+) uses <code>dm-snapshot</code> to store only the <em>delta</em> of the new slot during OTA: system_b is a copy-on-write overlay of system_a, stored in <code>userdata</code> via the <code>/metadata/ota/</code> state machine. After the next reboot the snapshot merges into the real partition. This eliminates the storage doubling cost while preserving atomic OTA semantics.</p></div></div>
+</div>
+<div>
+<h3 style="margin-bottom:14px">Troubleshooting Checklist</h3>
+<ul class="tsl">
+  <li><strong>Bootloop after OTA:</strong> Check BCB — <code>dd if=/dev/block/by-name/misc bs=1 count=32 | strings</code>. Stale "boot-recovery" = failed OTA. Try <code>fastboot --skip-reboot flashall</code>.</li>
+  <li><strong>dm-verity panic after modifying /system:</strong> You wrote to a verified partition. On userdebug: <code>adb root; adb disable-verity; adb reboot</code>. Never on production.</li>
+  <li><strong>HAL service not starting:</strong> <code>adb shell getprop init.svc.&lt;service_name&gt;</code>. If stopped, check <code>adb logcat | grep &lt;service&gt;</code>. Likely missing .ko — check <code>dmesg | grep modprobe</code>.</li>
+  <li><strong>AVB returns ORANGE on a locked device:</strong> Custom key installed. <code>avbtool info_image --image vbmeta.img</code> — OEM key in eFuse must match vbmeta signing key.</li>
+  <li><strong>Modem SSR crash loop:</strong> <code>adb shell cat /sys/bus/msm_subsys/devices/subsys0/state</code>. If OFFLINE: <code>dmesg | grep -E "PIL|MPSS|subsys"</code>. Persistent SSR marks the slot unbootable — bootloader reverts to the other slot.</li>
+  <li><strong>persist data corrupt:</strong> DO NOT wipe. Backup immediately: <code>dd if=/dev/block/by-name/persist of=/sdcard/persist.img</code>. Factory calibration escalation required.</li>
+  <li><strong>First stage init fails to mount /system:</strong> dm-verity root hash mismatch. Reflash: <code>fastboot flash vbmeta vbmeta.img</code>. If super is corrupt: <code>fastboot wipe-super super_empty.img</code> then reflash logical partitions.</li>
+</ul>
+</div>
+</div>
+</div></section>
+
+<footer role="contentinfo"><div class="wrap"><p>AOSP/AAOS Boot &amp; Image Architecture · Phase 2 Complete</p></div></footer>
+<script>
+/* ═══ MERMAID ═══════════════════════════════════════════════════ */
+const MM_CFG = {startOnLoad:false,theme:'dark',themeVariables:{background:'#0d1225',primaryColor:'#111827',primaryTextColor:'#e8edf7',primaryBorderColor:'#2a4070',lineColor:'#4a9eff',signalColor:'#4a9eff',signalTextColor:'#e8edf7',actorBkg:'#111827',actorBorder:'#2a4070',actorTextColor:'#e8edf7',noteBkgColor:'#161e33',noteTextColor:'#a0aec0',fontSize:'14px'},sequence:{mirrorActors:false,useMaxWidth:true,actorMargin:55}};
+const MM_SRC = {
+'boot-seq-wrap':`sequenceDiagram
+    participant PBL as PBL (ROM)
+    participant XBL as XBL
+    participant TZ as TrustZone EL3
+    participant ABL as ABL
+    participant K as Linux Kernel
+    participant FS1 as First Stage Init
+    participant FS2 as /system/bin/init
+    participant ZYG as Zygote
+    participant SS as System Server
+    PBL->>XBL: Verify XBL sig vs eFuse hash
+    XBL->>TZ: Load tz.mbn start secure world
+    XBL->>ABL: Verify ABL sig load abl.elf
+    ABL->>ABL: Read BCB misc check RPMB rollback
+    ABL->>ABL: libavb verify vbmeta chain
+    ABL->>K: Load boot.img merged ramdisk jump
+    K->>K: populate_rootfs cpio to tmpfs
+    K->>FS1: exec /init PID 1 from tmpfs
+    FS1->>FS1: dm-linear dm-verity mount /system /vendor
+    FS1->>FS2: execv selinux_setup still PID 1
+    FS2->>FS2: Load SELinux policy execv second_stage
+    FS2->>FS2: class_start core then hal then main
+    FS2->>ZYG: Start Zygote
+    ZYG->>SS: forkSystemServer
+    SS->>SS: ACTION_BOOT_COMPLETED`,
+'kinit-seq-wrap':`sequenceDiagram
+    participant ABL as ABL
+    participant KI as kernel_init
+    participant PR as populate_rootfs
+    participant TFS as tmpfs /
+    participant FSI as First Stage Init
+    participant ST as super partition
+    participant SSI as /system/bin/init
+    ABL->>KI: Jump to kernel DTB with initrd_start/end
+    KI->>PR: rootfs_initcall populate_rootfs
+    PR->>TFS: unpack_to_rootfs walk cpio entries
+    PR->>PR: free_initrd release ramdisk pages
+    KI->>FSI: run_init_process /init execv PID 1
+    FSI->>TFS: mount dev proc sys
+    FSI->>FSI: ueventd populate /dev/block/by-name
+    FSI->>TFS: read fstab.qcom from vendor ramdisk
+    FSI->>ST: read LpMetadata logical partition map
+    FSI->>FSI: create dm-linear system_a vendor_a odm_a
+    FSI->>FSI: verify Merkle root vs vbmeta HashTreeDescriptor
+    FSI->>FSI: create dm-verity over dm-linear
+    FSI->>ST: mount /system /vendor /odm read-only
+    FSI->>SSI: execv selinux_setup still PID 1
+    SSI->>SSI: load plat_sepolicy.cil vendor_sepolicy.cil
+    SSI->>SSI: execv second_stage still PID 1
+    SSI->>SSI: property service parse all rc files
+    SSI->>SSI: class_start core then hal then main`,
+'kinit-class-wrap':`sequenceDiagram
+    participant I as init second_stage
+    participant C as class core
+    participant H as class hal
+    participant M as class main
+    I->>I: Parse /system /vendor /odm rc files
+    I->>I: trigger early-init
+    I->>C: start ueventd
+    I->>I: trigger init mount_all early
+    I->>I: trigger late-init fs boot
+    I->>C: class_start core
+    Note over C: servicemanager logd vold adbd
+    I->>H: class_start hal
+    Note over H: display audio camera HALs registered
+    I->>M: class_start main
+    Note over M: zygote netd installd
+    M->>M: Zygote forks System Server
+    M->>M: ACTION_BOOT_COMPLETED`,
+'avb-seq-wrap':`sequenceDiagram
+    participant EF as eFuse HW
+    participant ABL as ABL libavb
+    participant RPM as RPMB
+    participant VM as vbmeta
+    participant FSI as First Stage Init
+    participant DMV as dm-verity
+    ABL->>VM: Read vbmeta bytes
+    ABL->>EF: Read OEM public key hash
+    ABL->>ABL: Verify RSA-4096 sig vs eFuse key
+    ABL->>RPM: Read rollback index via TrustZone SMC
+    ABL->>ABL: Check image rollback_index vs stored
+    ABL->>ABL: SHA-256 boot and vendor_boot vs HashDescriptor
+    ABL->>ABL: Set verifiedbootstate=green in cmdline
+    Note over FSI: First Stage Init at T+1.5s
+    FSI->>VM: Re-read vbmeta HashTreeDescriptors
+    FSI->>FSI: Create dm-linear and dm-verity
+    FSI->>RPM: Post-boot update rollback index if newer
+    Note over DMV: Runtime every block read
+    DMV->>DMV: SHA-256 block walk Merkle tree to root
+    DMV->>DMV: PASS return data or FAIL FEC or panic`,
+'rec-seq-wrap':`sequenceDiagram
+    participant HOST as Host adb
+    participant ADBD as adbd
+    participant INIT as init PID 1
+    participant BCB as misc BCB
+    participant K as Kernel
+    participant ABL as ABL
+    participant REC as Recovery OS
+    HOST->>ADBD: reboot recovery
+    ADBD->>INIT: SetProperty sys.powerctl reboot recovery
+    INIT->>INIT: Stop all services sync filesystems
+    INIT->>BCB: write command boot-recovery
+    Note over BCB: Persists in flash survives SoC reset
+    INIT->>K: syscall NR_reboot restart2 recovery
+    K->>K: Write IMEM restart_reason PSHOLD reset
+    Note over ABL: After reset PBL XBL ABL chain runs
+    ABL->>BCB: Read bootloader_message command
+    ABL->>ABL: command boot-recovery VAB path
+    ABL->>ABL: Add force_normal_boot=0 to cmdline
+    ABL->>REC: Jump to kernel recovery mode
+    REC->>BCB: Read bcb.recovery for arguments
+    REC->>REC: Start RecoveryUI framebuffer only
+    REC->>REC: Execute wipe or OTA or sideload
+    REC->>BCB: Clear command write status success
+    REC->>REC: Reboot to normal Android`,
+'hlos-seq-wrap':`sequenceDiagram
+    participant XBL as XBL UEFI
+    participant TZ as TrustZone EL3
+    participant AOP as AOP RPM
+    participant K as Linux Kernel
+    participant PIL as PIL remoteproc
+    participant MPQ as MPSS modem
+    participant ADS as ADSP audio
+    XBL->>TZ: Load tz.mbn TrustZone active EL3
+    XBL->>AOP: Load aop.mbn power management ready
+    XBL->>K: Load kernel via ABL
+    K->>K: Load vendor ko from vendor_dlkm
+    K->>PIL: init.rc start modem-loader service
+    PIL->>PIL: Read modem firmware from modem_a
+    PIL->>TZ: SMC authenticate modem.mbn ELF signature
+    TZ->>TZ: Verify signing key configure XPU
+    PIL->>MPQ: Copy firmware release MPSS from reset
+    MPQ->>MPQ: AMSS RTOS boots
+    MPQ->>PIL: SMEM handshake subsys MPSS READY
+    PIL->>K: Modem online QMI endpoints available
+    PIL->>ADS: Load adsp.mbn same flow
+    ADS->>K: SMEM handshake subsys ADSP READY`
+};
+const rendered = new Set();
+async function renderMM(id) {
+  const el = document.getElementById(id);
+  if (!el || rendered.has(id)) return;
+  rendered.add(id);
+  if (typeof mermaid === 'undefined') { el.innerHTML='<div class="mermaid-error">⚠ Mermaid not loaded. Check network.</div>'; return; }
+  try {
+    mermaid.initialize({...MM_CFG});
+    const {svg} = await mermaid.render('mm-'+id, MM_SRC[id].trim());
+    el.innerHTML = svg;
+    const s = el.querySelector('svg');
+    if (s) { s.removeAttribute('height'); s.style.maxWidth='100%'; s.style.height='auto'; }
+  } catch(e) {
+    el.innerHTML='<div class="mermaid-error">⚠ Render failed: '+e.message+'</div><details style="margin-top:6px"><summary style="cursor:pointer;font-family:var(--fc);font-size:.7rem;color:var(--txt3)">Show source</summary><pre class="mermaid-source">'+MM_SRC[id].replace(/</g,'&lt;')+'</pre></details>';
+  }
+}
+function renderForPanel(pid) {
+  if (pid==='panel-boot')     renderMM('boot-seq-wrap');
+  if (pid==='panel-kinit')    { renderMM('kinit-seq-wrap'); renderMM('kinit-class-wrap'); }
+  if (pid==='panel-avb')      renderMM('avb-seq-wrap');
+  if (pid==='panel-recovery') renderMM('rec-seq-wrap');
+  if (pid==='panel-hlos')     renderMM('hlos-seq-wrap');
+}
+window.addEventListener('load', () => setTimeout(() => renderForPanel('panel-boot'), 300));
+
+/* ═══ LOTTIE ═══════════════════════════════════════════════════ */
+const lottieMap = {};
+function initLottie(pid) {
+  const p = document.getElementById(pid); if (!p || typeof lottie==='undefined') return;
+  p.querySelectorAll('[data-lottie]').forEach(el => {
+    if (lottieMap[el.id]) return;
+    try {
+      const a = lottie.loadAnimation({container:el,renderer:'svg',loop:el.dataset.loop!=='false',autoplay:true,path:el.dataset.lottie});
+      if (el.dataset.loop==='false') a.addEventListener('complete',()=>a.stop());
+      if (document.body.classList.contains('nomotion')) a.pause();
+      lottieMap[el.id]=a;
+    } catch(e) {}
+  });
+}
+window.addEventListener('load', () => initLottie('panel-boot'));
+
+/* ═══ TABS ══════════════════════════════════════════════════════ */
+const TABS = Array.from(document.querySelectorAll('[role="tab"]'));
+const PANELS = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+function activateTab(tab) {
+  TABS.forEach(t=>{t.setAttribute('aria-selected','false');t.tabIndex=-1;});
+  PANELS.forEach(p=>p.classList.remove('active'));
+  tab.setAttribute('aria-selected','true'); tab.tabIndex=0;
+  const pid = tab.getAttribute('aria-controls');
+  const panel = document.getElementById(pid);
+  if (panel) { panel.classList.add('active'); panel.focus({preventScroll:true}); initLottie(pid); renderForPanel(pid); if(pid==='panel-images')setTimeout(animPTL,100); }
+  document.querySelector('.tl-inner').classList.remove('open');
+  document.getElementById('tab-toggle').setAttribute('aria-expanded','false');
+}
+TABS.forEach(tab => {
+  tab.addEventListener('click', ()=>activateTab(tab));
+  tab.addEventListener('keydown', e=>{
+    const idx=TABS.indexOf(tab); let nx;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') nx=TABS[(idx+1)%TABS.length];
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp') nx=TABS[(idx-1+TABS.length)%TABS.length];
+    else if(e.key==='Home') nx=TABS[0]; else if(e.key==='End') nx=TABS[TABS.length-1];
+    if(nx){e.preventDefault();nx.focus();activateTab(nx);}
+  });
+});
+function switchTab(id){const t=document.getElementById(id);if(t){activateTab(t);t.scrollIntoView({behavior:'smooth',block:'nearest'});}}
+function tmt(){const m=document.querySelector('.tl-inner'),b=document.getElementById('tab-toggle');const o=m.classList.toggle('open');b.setAttribute('aria-expanded',o?'true':'false');}
+
+/* ═══ REDUCE MOTION ════════════════════════════════════════════ */
+const rmBtn=document.getElementById('rm-btn');
+rmBtn.addEventListener('click',()=>{
+  const on=rmBtn.classList.toggle('on');
+  rmBtn.setAttribute('aria-checked',on?'true':'false');
+  document.documentElement.style.setProperty('--dur',on?'0s':'0.28s');
+  document.body.classList.toggle('nomotion',on);
+  Object.values(lottieMap).forEach(a=>on?a.pause():a.play());
+});
+rmBtn.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();rmBtn.click();}});
+
+/* ═══ TOOLTIP + DEEP-DIVE DATA ════════════════════════════════
+   Each entry: title, body, rm (tab id to switch to), rml (label),
+   dd (deep-dive HTML string, optional)
+═══════════════════════════════════════════════════════════════ */
+const TD = {
+  pbl:{title:'PBL — Primary Boot Loader',body:'Lives in read-only ROM. Validates XBL signature against OEM key hash burned into eFuse — the hardware root of trust. Cannot be modified after manufacture.',rm:null,
+    dd:`<h6>Deep Dive</h6><p>PBL code executes directly from internal ROM at the CPU reset vector. It reads the XBL partition, verifies its RSA signature against the OEM key hash stored in a one-time-programmable eFuse register, and transfers execution. If verification fails, PBL enters an infinite loop — there is no fallback.</p><p><strong>Key point:</strong> PBL is your ultimate hardware root. Any exploit in PBL requires silicon-level access.</p>`},
+  xbl:{title:'XBL — eXtensible Boot Loader',body:'UEFI-based. Performs full hardware init: DDR, clocks, regulators. Loads TrustZone (EL3) and AOP firmware.',rm:null,
+    dd:`<h6>Deep Dive</h6><p>XBL is based on EDK2 (UEFI open-source framework). It initialises DDR via DRAM training, brings up voltage regulators and clock trees, and runs UEFI DXE drivers for board-specific init. OEMs can add their own UEFI DXE modules here for board-specific initialisation without modifying XBL source.</p><p>After hardware init, XBL loads <code>tz.mbn</code> (TrustZone) and <code>aop.mbn</code> (Always-On Processor) before handing off to ABL.</p>`},
+  abl:{title:'ABL — Android Boot Loader',body:'Reads BCB from misc, checks RPMB rollback via TrustZone SMC, runs libavb to verify vbmeta chain, merges ramdisks.',rm:null,
+    dd:`<h6>Deep Dive — libavb verification</h6><div class="cb"><div class="ch"><span class="cl">Key ABL actions</span></div><pre><code>1. Read BCB from misc → boot decision
+2. Read RPMB rollback index via TZ SMC
+3. Read vbmeta → verify RSA-4096 sig vs eFuse
+4. SHA-256 boot.img + vendor_boot.img
+5. Merge ramdisks (generic + vendor cpio)
+6. Pass verified params in kernel cmdline
+7. Jump to kernel entry point</code></pre></div>`},
+  avb:{title:'AVB 2.0 — Android Verified Boot',body:'Layered cryptographic chain of trust: eFuse → vbmeta RSA-4096 → HashTreeDescriptors → dm-verity at runtime.',rm:'tab-avb',rml:'AVB deep dive →',
+    dd:`<h6>Deep Dive — chain partition model</h6><p>vbmeta uses <em>chain partition descriptors</em> to delegate signing authority: <code>vbmeta_system</code> is signed by Google, <code>vbmeta_vendor</code> is signed by the SoC vendor. This means Google can update system without re-signing vendor and vice versa.</p>`},
+  tz:{title:'TrustZone — QSEE (ARM EL3)',body:'Runs at ARM EL3. Custodies RPMB key, runs KeyMint, Widevine DRM L1, HDCP, biometric matching. Unreachable from kernel.',rm:null,
+    dd:`<h6>Deep Dive — TrustZone TEE services</h6><p>TrustZone hosts multiple <em>Trusted Applications (TAs)</em>: KeyMint TA (Android Keystore), Widevine TA (DRM), HDCP TA, Fingerprint TA, RPMB TA. Each TA runs in its own isolated sandbox within the secure world. The QSEE (Qualcomm Secure Execution Environment) acts as the TEE OS managing these TAs.</p>`},
+  kernel:{title:'Linux Kernel (GKI)',body:'Boots at EL1. Calls populate_rootfs() to decompress the cpio ramdisk from DDR into tmpfs. Never touches eMMC filesystem at this stage.',rm:'tab-kinit',rml:'Kernel→Init deep dive →',
+    dd:`<h6>Deep Dive — populate_rootfs()</h6><p>The kernel calls <code>populate_rootfs()</code> as a <code>rootfs_initcall</code>. It detects the compression type (gz/lz4/zstd) of the initrd, decompresses it, and walks the cpio entries: for each entry it calls <code>mkdir</code>, <code>mknod</code>, or writes file data into the tmpfs. After extraction, <code>free_initrd()</code> releases the compressed ramdisk pages back to the page allocator.</p>`},
+  ramdisk:{title:'Ramdisk → tmpfs',body:'ABL merges generic ramdisk (boot.img) and vendor ramdisk (vendor_boot.img) into one cpio.gz. populate_rootfs() decompresses into tmpfs.',rm:'tab-kinit',rml:'See populate_rootfs() →',
+    dd:`<h6>Deep Dive — ramdisk merge</h6><p>Android 11+ uses a <em>merged ramdisk</em> model. ABL reads the generic ramdisk from <code>boot.img</code> and the vendor ramdisk from <code>vendor_boot.img</code>. It concatenates the two cpio archives in memory — the kernel's cpio parser handles this naturally since cpio archives are self-delimiting. The result contains both <code>/init</code> (from the generic ramdisk) and <code>/vendor</code> fragments + <code>fstab.qcom</code> (from vendor ramdisk).</p>`},
+  dt:{title:'Device Tree (DTB + DTBO)',body:'ABL reads base DTB from vendor_boot and selects the correct DTBO from dtbo partition based on hardware ID straps. Merged DTB passed to kernel.',rm:null,
+    dd:`<h6>Deep Dive — DTBO selection</h6><p>The dtbo partition contains an array of Device Tree Blob Overlays. ABL reads hardware configuration straps (GPIO state read by PMIC) or an ADC voltage divider to determine the hardware variant ID. It selects the matching DTBO index, applies the overlay to the base DTB using libfdt, and passes the merged result to the kernel via the ATAGS/DTB pointer in the kernel image header.</p>`},
+  fsi:{title:'First Stage Init',body:'Executes /init from tmpfs (RAM) as PID 1. Creates dm-linear from LpMetadata, wraps with dm-verity, mounts /system /vendor /odm RO.',rm:'tab-kinit',rml:'dm-linear + dm-verity explainer →',
+    dd:`<h6>Deep Dive — key first stage actions</h6><div class="cb"><div class="ch"><span class="cl">Sequence</span></div><pre><code>1. Mount /dev /proc /sys (tmpfs/proc/sysfs)
+2. Start ueventd → populate /dev/block/by-name
+3. Read androidboot.slot_suffix from cmdline
+4. Open super, read LpMetadata
+5. Create dm-linear device mapper entries
+6. Read vbmeta HashTreeDescriptors
+7. Create dm-verity targets (verify Merkle root)
+8. mount /system /vendor /odm (erofs, ro)
+9. execv /system/bin/init selinux_setup</code></pre></div>`},
+  ssi:{title:'Second Stage Init',body:'Loads SELinux policy. Parses .rc files from /system /vendor /odm. Starts services: class core → hal → main.',rm:'tab-kinit',rml:'init.rc class ordering →',
+    dd:`<h6>Deep Dive — property service</h6><p>Second stage init starts the <em>property service</em>, a Unix domain socket at <code>/dev/socket/property_service</code>. All processes set properties via this socket; init validates the caller's SELinux context and UID before accepting the write. Properties starting with <code>ro.</code> are read-only. Properties starting with <code>ctl.</code> trigger service start/stop actions.</p>`},
+  zygote:{title:'Zygote — ART Preload',body:'Initialises ART VM and preloads all framework classes and resources. Every Android app process is forked from Zygote.',rm:null,
+    dd:`<h6>Deep Dive — ART preloading</h6><p>Zygote calls <code>ZygoteInit.preload()</code> which loads ~12,000 framework classes and ~70 MB of resources into memory. After preloading, Zygote calls <code>zygote_begin()</code> to drop unneeded capabilities and forks a prefork process. Every subsequent <code>app_process</code> fork uses copy-on-write semantics — the framework classes are shared in memory until the first write, drastically reducing app launch time and memory usage.</p>`},
+  sysserver:{title:'System Server',body:'Forked from Zygote. Hosts ~80 core Android services: AMS, WMS, PMS, etc. Broadcasts ACTION_BOOT_COMPLETED when ready.',rm:null,
+    dd:`<h6>Deep Dive — critical system services</h6><p>System Server starts services in phases: (1) <em>bootstrap services</em> (ActivityManagerService, PowerManagerService), (2) <em>core services</em> (BatteryService, UsageStatsService), (3) <em>other services</em> (NetworkPolicyManagerService, WindowManagerService, PackageManagerService). When all services are ready, AMS broadcasts <code>ACTION_BOOT_COMPLETED</code>. In automotive, CarService is also started here to manage VHAL connectivity.</p>`},
+  launcher:{title:'Launcher — Boot Complete',body:'Receives ACTION_BOOT_COMPLETED and draws the home screen. All HALs operational, GPU pipeline live.',rm:null,
+    dd:`<h6>Deep Dive — automotive camera requirement</h6><p>In automotive contexts, the Launcher app may not be the first visible UI. Regulatory requirements in many markets mandate that the rear-view camera must be visible within 2 seconds of ignition. This requires a dedicated fast-boot path — typically a TrustZone Trusted App or a separate RTOS microcontroller — to bring up the display controller, camera ISP, and Venus video pipeline independently of the full Android init chain.</p>`}
+};
+
+let curNode = null, ddOpen = false;
+function st(evt, tid) {
+  evt.stopPropagation();
+  const data = TD[tid]; if (!data) return;
+  document.getElementById('tt-title').textContent = data.title;
+  document.getElementById('tt-body').textContent  = data.body;
+  const rm = document.getElementById('tt-rm');
+  if (data.rm) { rm.style.display='inline'; rm.textContent=data.rml||'Read more →'; rm.dataset.target=data.rm; } else rm.style.display='none';
+  const ddBtn = document.getElementById('tt-dd-btn');
+  const ddEl  = document.getElementById('tt-dd');
+  if (data.dd) { ddBtn.style.display='inline'; ddBtn.textContent='Show deep dive ▼'; ddBtn.classList.remove('open'); ddBtn.setAttribute('aria-expanded','false'); ddEl.innerHTML=data.dd; ddEl.classList.remove('open'); ddOpen=false; }
+  else { ddBtn.style.display='none'; ddEl.classList.remove('open'); ddEl.innerHTML=''; ddOpen=false; }
+  document.getElementById('tt').classList.toggle('wide', !!data.dd);
+  if (curNode) curNode.setAttribute('aria-expanded','false');
+  curNode = evt.currentTarget; curNode.setAttribute('aria-expanded','true');
+  const rect = curNode.querySelector('rect');
+  posTT(rect, evt);
+  document.getElementById('tt').classList.add('show');
+}
+function toggleDD() {
+  ddOpen = !ddOpen;
+  const ddEl = document.getElementById('tt-dd'), btn = document.getElementById('tt-dd-btn');
+  ddEl.classList.toggle('open', ddOpen);
+  btn.classList.toggle('open', ddOpen);
+  btn.setAttribute('aria-expanded', ddOpen?'true':'false');
+  btn.textContent = ddOpen ? 'Hide deep dive ▲' : 'Show deep dive ▼';
+  // Reposition tooltip after expansion
+  if (curNode) { const rect = curNode.querySelector('rect'); posTT(rect, null); }
+}
+function posTT(rectEl, evt) {
+  const tt = document.getElementById('tt'); tt.style.display='block';
+  const tw=tt.offsetWidth, th=tt.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
+  let x, y;
+  if (rectEl) { const br=rectEl.getBoundingClientRect(); x=br.right+12; y=br.top; }
+  else { x=evt&&evt.clientX!==undefined?evt.clientX+14:vw/2-tw/2; y=evt&&evt.clientY!==undefined?evt.clientY-10:vh/2-th/2; }
+  if(x+tw>vw-8) x=vw-tw-8; if(y+th>vh-8) y=vh-th-8; if(y<8) y=8; if(x<8) x=8;
+  tt.style.left=x+'px'; tt.style.top=y+'px';
+}
+function htt() { document.getElementById('tt').classList.remove('show'); if(curNode){curNode.setAttribute('aria-expanded','false');curNode=null;} }
+function ttRM() { const t=document.getElementById('tt-rm').dataset.target; htt(); if(t) switchTab(t); }
+function nk(evt,tid) { if(evt.key==='Enter'||evt.key===' '){evt.preventDefault();st(evt,tid);} if(evt.key==='Escape')htt(); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') htt(); });
+document.addEventListener('click', e=>{ const tt=document.getElementById('tt'); if(!tt.contains(e.target)&&!e.target.closest('.bd-node')) htt(); });
+
+/* ═══ ZOOM ══════════════════════════════════════════════════════ */
+const ZS={};
+function zD(id,f){ZS[id]=Math.max(.3,Math.min(3,(ZS[id]||1)*f));const el=document.getElementById(id);if(el)el.style.transform=`scale(${ZS[id]})`;}
+function rzD(id){ZS[id]=1;const el=document.getElementById(id);if(el)el.style.transform='scale(1)';}
+
+/* ═══ DM-VERITY STEPPER ════════════════════════════════════════ */
+let dmvCur=1, dmvMax=6;
+const DMV_T=['Step 1 of 6 — super Partition Layout','Step 2 of 6 — LpMetadata & Extent Map','Step 3 of 6 — dm-linear Sector Translation','Step 4 of 6 — dm-verity Hash-Checked Layer','Step 5 of 6 — Merkle Hash Tree Visual','Step 6 of 6 — Failure Modes & Init Response'];
+function dmvN(d){
+  dmvCur=Math.max(1,Math.min(dmvMax,dmvCur+d));
+  document.querySelectorAll('.dmvstep').forEach((s,i)=>s.classList.toggle('active',i===dmvCur-1));
+  document.getElementById('dmv-fill').style.width=(dmvCur/dmvMax*100)+'%';
+  document.getElementById('dmv-ctr').textContent=dmvCur+' / '+dmvMax;
+  document.getElementById('dmv-title').textContent=DMV_T[dmvCur-1];
+  const prog=document.querySelector('#dmv [role="progressbar"]'); if(prog) prog.setAttribute('aria-valuenow',dmvCur);
+  document.getElementById('dmv-prev').disabled=dmvCur===1;
+  document.getElementById('dmv-next').disabled=dmvCur===dmvMax;
+}
+
+/* ═══ SCROLL REVEAL ════════════════════════════════════════════ */
+const rvObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');rvObs.unobserve(e.target);}});},{threshold:.1});
+document.querySelectorAll('.rv').forEach(el=>rvObs.observe(el));
+
+/* ═══ COPY ══════════════════════════════════════════════════════ */
+function cp(btn){
+  const pre=btn.closest('.cb').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText||pre.textContent).then(()=>{
+    const o=btn.textContent; btn.textContent='✓ Copied'; btn.classList.add('ok');
+    setTimeout(()=>{btn.textContent=o;btn.classList.remove('ok');},2000);
+  }).catch(()=>{});
+}
+
+/* ═══ FAQ ═══════════════════════════════════════════════════════ */
+function fq(id){
+  const item=document.getElementById(id); if(!item) return;
+  const isOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq.open').forEach(f=>{f.classList.remove('open');f.querySelector('.faqq').setAttribute('aria-expanded','false');});
+  if(!isOpen){item.classList.add('open');item.querySelector('.faqq').setAttribute('aria-expanded','true');}
+}
+
+/* ═══ PARTITION TIMELINE ═══════════════════════════════════════ */
+function animPTL(){document.querySelectorAll('#ptl .ptlb').forEach((b,i)=>setTimeout(()=>b.classList.add('anim'),i*50));}
+const ptlObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){animPTL();ptlObs.disconnect();}});},{threshold:.2});
+const ptlEl=document.getElementById('ptl'); if(ptlEl) ptlObs.observe(ptlEl);
+
+/* ═══ PARTITION DETAIL PANEL ════════════════════════════════════ */
+const PD={
+  boot:{name:'boot',col:'var(--amber)',sum:'Contains the GKI Linux kernel image and generic ramdisk (cpio.gz). Loaded into RAM by ABL and never mounted as a filesystem.',avb:'Full SHA-256 HashDescriptor in vbmeta. Entire partition hashed upfront by ABL before jumping to kernel.',fail:'Device fails to boot. Reflash: <code>fastboot flash boot boot.img</code>',debug:'adb shell cat /proc/version\nfastboot getvar all'},
+  vendor_boot:{name:'vendor_boot',col:'var(--amber)',sum:'Contains vendor ramdisk fragments, DTB, and fstab. Introduced in Android 11 to separate OEM content from GKI boot image, enabling independent updates.',avb:'Full SHA-256 HashDescriptor in vbmeta — verified alongside boot by ABL.',fail:'First stage init cannot find fstab. Check: <code>dmesg | grep fstab</code>',debug:'adb shell ls /vendor/etc/fstab*\nfastboot flash vendor_boot vendor_boot.img'},
+  dtbo:{name:'dtbo',col:'var(--amber)',sum:'Device Tree Blob Overlays. ABL selects the correct overlay based on hardware ID straps and merges it onto the base DTB from vendor_boot.',avb:'Separate HashDescriptor in vbmeta — verified by ABL.',fail:'Wrong overlay → wrong peripheral addresses → hardware not initialised.',debug:'adb shell cat /proc/device-tree/model\nadb shell dmesg | grep dt'},
+  vbmeta:{name:'vbmeta / vbmeta_system / vbmeta_vendor',col:'var(--purple)',sum:'The AVB metadata partition. Contains RSA-4096 signatures and hash descriptors. Chain partition model enables Google and vendor to sign their own partitions independently.',avb:'vbmeta IS the AVB root. Verified against OEM key hash from eFuse.',fail:'AVB failure → boot refused. <code>fastboot getvar verified-boot-state</code>',debug:'fastboot getvar verified-boot-state\navbtool info_image --image vbmeta.img'},
+  system:{name:'system',col:'var(--blue)',sum:'Core Android OS — pure AOSP maintained by Google. Contains framework, system apps, and base libraries. Always mounted read-only via dm-verity.',avb:'HashTreeDescriptor in vbmeta_system — Merkle tree per block at runtime.',fail:'dm-verity violation → kernel panic. Check <code>dmesg | grep dm-verity</code>',debug:'adb shell df /system\nadb shell mount | grep system\nadb remount  # debug builds only'},
+  system_ext:{name:'system_ext',col:'var(--blue)',sum:'Extensions to /system: GMS components, OEM framework extensions, Mainline module staging. Avoids polluting /system while maintaining system-level access.',avb:'HashTreeDescriptor in vbmeta_system.',fail:'GMS or framework extension not found → specific features broken.',debug:'adb shell ls /system_ext/\nadb shell pm list packages -f | grep system_ext'},
+  system_dlkm:{name:'system_dlkm',col:'var(--blue)',sum:'GKI extension kernel modules by Google. fuse.ko, incremental_fs.ko (Play Store streaming), dm_user.ko (VAB snapshots). Google can update independently of vendor.',avb:'HashTreeDescriptor in vbmeta_system — Google-signed.',fail:'fuse.ko missing → FUSE mounts fail. incremental_fs.ko missing → Play streaming fails.',debug:'adb shell ls /system_dlkm/lib/modules/\nadb shell lsmod | grep fuse'},
+  vendor:{name:'vendor',col:'var(--green)',sum:"SoC vendor partition. Contains HAL binaries, VNDK libraries, hardware config, and proprietary blobs. The Treble boundary — Google's CTS does not cross here.",avb:'HashTreeDescriptor in vbmeta_vendor — vendor-signed.',fail:'HAL crash → hardware unavailable. <code>adb shell lshal</code>',debug:'adb shell lshal\nadb shell ls /vendor/bin/hw/'},
+  vendor_dlkm:{name:'vendor_dlkm',col:'var(--green)',sum:'SoC vendor Dynamic Loadable Kernel Modules. Hardware-specific .ko files separate from GKI kernel. GKI KMI stability means Google can patch kernel without vendor rebuilding these.',avb:'HashTreeDescriptor in vbmeta_vendor — vendor-signed.',fail:'Module load failure → hardware not initialised. <code>dmesg | grep modprobe</code>',debug:'adb shell lsmod\nadb shell cat /vendor_dlkm/lib/modules/modules.load'},
+  odm:{name:'odm / odm_dlkm',col:'var(--green)',sum:'Tier-1 supplier partition (Harman, Visteon, Continental). Board-specific HALs, proprietary sensor drivers, ODM security modules.',avb:'HashTreeDescriptor in vbmeta — ODM-signed key.',fail:'ODM hardware (HVAC, HSM) not functional.',debug:'adb shell ls /odm/\nadb shell lshal | grep odm'},
+  product:{name:'product',col:'var(--blue)',sum:'Carrier/OEM customisation. Pre-installed apps, branding overlays, RRO. Keeps customisations separate from /system to avoid affecting GMS certification.',avb:'HashTreeDescriptor in vbmeta_system or separate vbmeta_product.',fail:'Carrier apps missing or branding not applied. Non-critical to basic function.',debug:'adb shell pm list packages -f | grep /product\nadb shell ls /product/overlay/'},
+  misc:{name:'misc',col:'var(--red)',sum:'Bootloader↔Android communication. BCB at offset 0x0000 is written by Android before reboot and read by ABL after reset. The only reliable cross-reset communication channel.',avb:'Not AVB verified — bootloader reads before AVB starts.',fail:'Corrupt BCB → defaults to normal boot. Stale boot-recovery → bootloop into recovery.',debug:'adb shell dd if=/dev/block/by-name/misc bs=1 count=32 2>/dev/null | strings\nadb shell hexdump -C /dev/block/by-name/misc | head'},
+  persist:{name:'persist',col:'var(--red)',sum:'Factory calibration data — NEVER wiped. WiFi RF cal, BT NV items, display colour LUT, sensor zero-offsets. Measured per-device in factory with specialised equipment.',avb:'Not AVB verified.',fail:'⚠ NEVER wipe. WiFi may violate RF regulations, sensors drift. Factory recalibration required.',debug:'adb shell ls /mnt/vendor/persist/\n# DO NOT delete files here on production'},
+  metadata:{name:'metadata',col:'var(--red)',sum:'Encryption and OTA state. FBE key references needed to boot to lock screen. VAB OTA snapshot status. Not encrypted itself — accessible before user PIN.',avb:'Not AVB verified.',fail:'Corrupt: FBE cannot reconstruct keys → forced factory reset. Corrupt OTA state → VAB merge fails.',debug:'adb shell ls /metadata/\nadb shell cat /metadata/ota/snapshot_status'},
+  frp:{name:'frp — Factory Reset Protection',col:'var(--red)',sum:'Google anti-theft. Contains Google account binding token. Survives factory reset — device requires original Google account after reset.',avb:'Not AVB verified.',fail:'FRP set + device reset → setup wizard blocked. Enterprise: use zero-touch enrollment.',debug:'adb shell dd if=/dev/block/by-name/frp bs=512 count=1 | hexdump | head\n# fastboot erase frp (requires unlocked BL)'},
+  modem:{name:'modem/adsp/cdsp/slpi/tz/aop/venus',col:'var(--orange)',sum:'NON-HLOS firmware partitions. Each subsystem has its own A/B partition. Authenticated by TrustZone before PIL loads. XPU isolates subsystem DDR from HLOS.',avb:'TrustZone authentication via vendor signing key before PIL loads each subsystem.',fail:'SSR on crash. Persistent SSR → slot unbootable → bootloader reverts slot.',debug:'adb shell cat /sys/bus/msm_subsys/devices/subsys0/state\nadb shell dmesg | grep -E "MPSS|ADSP|PIL"\nfastboot flash modem modem.img'}
+};
+function showP(id){
+  const data=PD[id]; if(!data) return;
+  document.querySelectorAll('.pc.sel').forEach(c=>c.classList.remove('sel'));
+  const card=document.getElementById('pci-'+id); if(card) card.classList.add('sel');
+  const pd=document.getElementById('pd'),pdc=document.getElementById('pd-content');
+  pdc.innerHTML=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><h3 style="color:${data.col};margin:0">${data.name}</h3></div>
+  <div class="g2">
+    <div><h4 style="margin-bottom:5px">Summary</h4><p style="font-size:.83rem">${data.sum}</p><h4 style="margin-bottom:4px;margin-top:10px">AVB / Security</h4><p style="font-size:.82rem">${data.avb}</p></div>
+    <div><h4 style="margin-bottom:4px">Common Failure Modes</h4><p style="font-size:.82rem">${data.fail}</p><h4 style="margin-bottom:4px;margin-top:10px">Debug Commands</h4>
+    <div class="cb"><div class="ch"><span class="cl">Shell</span><button class="cp-btn" onclick="cp(this)">Copy</button></div><pre><code>${data.debug}</code></pre></div></div>
+  </div>`;
+  pd.classList.add('show');
+  pd.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+</script>
+</body>
+</html>
